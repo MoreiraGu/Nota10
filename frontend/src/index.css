@@ -1,0 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+
+  /* Navbar (topo, sem sidebar) */
+  --color-navbar: #FFC700;
+  --color-navbar-hover: rgba(0, 0, 0, 0.06);
+  --color-navbar-active: #FFFFFF;
+  --color-navbar-text: #33290A;
+  --color-navbar-text-muted: rgba(51, 41, 10, 0.65);
+
+  --color-primary: #E6A700;
+  --color-primary-hover: #C79000;
+  --color-primary-light: #FFF7DD;
+  --color-primary-text: #2B2200;
+
+  /* Superfície amarelo-clara usada em cards, tabelas, contraste com o fundo branco */
+  --color-tint: #FFF9E6;
+  --color-tint-strong: #FFF1C2;
+  --color-tint-border: #EAD98C;
+
+  --color-text: #211C10;
+  --color-text-secondary: #5B5645;
+  --color-text-muted: #948F7C;
+
+  --color-border: #E7E5E0;
+  --color-border-strong: #D2CFC7;
+
+  --color-success: #0A7C52;
+  --color-success-bg: #ECFDF5;
+  --color-success-text: #064E34;
+
+  --color-warning: #B45309;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-text: #78350F;
+
+  --color-error: #B91C1C;
+  --color-error-bg: #FEF2F2;
+  --color-error-text: #7F1D1D;
+
+  --color-inactive: #5B5645;
+  --color-inactive-bg: #F3F4F6;
+  --color-inactive-text: #374151;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --radius: 10px;
+
+  /* Sombra "de cartão empilhado": deslocamento seco, sem borrão pesado -
+     substitui a sombra cinza genérica de qualquer dashboard de SaaS */
+  --shadow-card: 0 1px 2px rgba(33, 28, 16, 0.04), 3px 3px 0 rgba(33, 28, 16, 0.06);
+  --shadow-card-hover: 0 2px 4px rgba(33, 28, 16, 0.05), 4px 4px 0 rgba(33, 28, 16, 0.08);
+  --shadow-btn: 2px 2px 0 rgba(33, 28, 16, 0.14);
+}
+
+* {
+  font-family: var(--font-sans);
+}
+
+html {
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+input, select, textarea {
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px rgba(230, 167, 0, 0.18);
+}
+
+/* Cartão padrão do sistema: fundo levemente amarelado (contraste com o
+   branco do fundo geral), contorno amarelo e sombra seca sutil. */
+.card-surface {
+  background: var(--color-tint);
+  border: 1.5px solid var(--color-tint-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.card-surface-plain {
+  background: #FFFFFF;
+  border: 1.5px solid var(--color-tint-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
