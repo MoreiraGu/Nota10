@@ -60,8 +60,16 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 }
 
+export interface ProfessorApi {
+  id: number;
+  nome: string;
+  email: string;
+  contato?: string;
+  situacao: string;
+}
+
 export const api = {
-  // ── Autenticação ─────────────────────────────────────────────
+  // ── Autenticação ───────────────────────────────────────────────────────
   async login(email: string, senha: string) {
     const data = await request<{
       access_token: string;
@@ -85,12 +93,12 @@ export const api = {
     }>('/auth/me');
   },
 
-  // ── Cursos ───────────────────────────────────────────────────
+  // ── Cursos ─────────────────────────────────────────────────────────────
   async getCursos() {
     return request<Array<{ id: number; nome: string }>>('/cursos');
   },
 
-  // ── Estudantes ───────────────────────────────────────────────
+  // ── Estudantes ─────────────────────────────────────────────────────────
   async getEstudantes() {
     return request<
       Array<{
@@ -172,13 +180,30 @@ export const api = {
     });
   },
 
-    async reativarEstudante(id: string | number) {
+  async reativarEstudante(id: string | number) {
     return request<{
       id: number;
       situacao: string;
     }>(`/estudantes/${id}`, {
-      method: 'PUT', // use o mesmo method do seu updateEstudante
+      method: 'PUT',
       body: JSON.stringify({ situacao: 'ATIVO' }),
+    });
+  },
+
+  // ── Professores ────────────────────────────────────────────────────────
+  async getProfessores() {
+    return request<ProfessorApi[]>('/professores');
+  },
+
+  async createProfessor(data: {
+    nome: string;
+    email: string;
+    senha: string;
+    contato: string;
+  }) {
+    return request<ProfessorApi & { usuario_id: number }>('/professores', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 };
