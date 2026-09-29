@@ -8,12 +8,41 @@ from app.api.deps import get_db, require_perfil
 from app.core.security import hash_senha
 from app.models.professor import Professor, SituacaoProfessor
 from app.models.usuario import Perfil, Usuario
-from app.schemas.professor import ProfessorCreate, ProfessorListItem, ProfessorResponse
+from app.schemas.professor import (
+    ProfessorCreate,
+    ProfessorListItem,
+    ProfessorResponse,
+    ProfessorUpdate,
+)
 
 router = APIRouter(prefix="/professores", tags=["Professores"])
 
 _somente_coordenacao = Depends(require_perfil(Perfil.COORDENACAO))
 
+
+def _email_conflito() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
+
+
+def _obter_ou_404(db: Session, professor_id: int) -> Professor:
+    professor = db.query(Professor).filter(Professor.id == professor_id).first()
+    if not professor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor não encontrado")
+    return professor
+
+
+def _to_response(p: Professor) -> ProfessorResponse:
+    return ProfessorResponse(
+        id=p.id,
+        usuario_id=p.usuario_id,
+        nome=p.usuario.nome,
+        email=p.usuario.email,
+        contato=p.contato or "",
+        situacao=p.situacao.value,
+    )
+
+
+# ── Criar ────────────────────────────────────────────────────────────────
 
 @router.post(
     "",
@@ -32,13 +61,8 @@ def criar_professor(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[Usuario, _somente_coordenacao],
 ) -> ProfessorResponse:
-    email_conflito = HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="E-mail já cadastrado",
-    )
-
     if db.query(Usuario).filter(Usuario.email == body.email).first():
-        raise email_conflito
+        raise _email_conflito()
 
     novo_usuario = Usuario(
         nome=body.nome,
@@ -62,19 +86,13 @@ def criar_professor(
     except IntegrityError:
         # Corrida entre duas requisições com o mesmo e-mail
         db.rollback()
-        raise email_conflito
+        raise _email_conflito()
 
     db.refresh(novo_professor)
+    return _to_response(novo_professor)
 
-    return ProfessorResponse(
-        id=novo_professor.id,
-        usuario_id=novo_usuario.id,
-        nome=novo_usuario.nome,
-        email=novo_usuario.email,
-        contato=novo_professor.contato or "",
-        situacao=novo_professor.situacao.value,
-    )
 
+# ── Listar ───────────────────────────────────────────────────────────────
 
 @router.get(
     "",
@@ -100,3 +118,98 @@ def listar_professores(
         )
         for p in professores
     ]
+
+
+# ── Obter ────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{professor_id}",
+    response_model=ProfessorResponse,
+    summary="Obtém professor por ID",
+    description="Retorna os detalhes do professor. Restrito à Coordenação. 404 se não existir.",
+)
+def obter_professor(
+    professor_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, _somente_coordenacao],
+) -> ProfessorResponse:
+    return _to_response(_obter_ou_404(db, professor_id))
+
+
+# ── Atualizar ────────────────────────────────────────────────────────────
+
+@router.put(
+    "/{professor_id}",
+    response_model=ProfessorResponse,
+    summary="Atualiza professor por ID",
+    description=(
+        "Atualiza apenas os campos enviados (nome, e-mail, senha, contato, situação). "
+        "Enviar `situacao` = `INATIVO` desativa também o login; `ATIVO` reativa. "
+        "Restrito à Coordenação. 404 se não existir, 409 se o e-mail já for de outro usuário, "
+        "400 para campos inválidos."
+    ),
+)
+def atualizar_professor(
+    professor_id: int,
+    body: ProfessorUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, _somente_coordenacao],
+) -> ProfessorResponse:
+    professor = _obter_ou_404(db, professor_id)
+    usuario = professor.usuario
+
+    if body.email is not None and body.email != usuario.email:
+        duplicado = (
+            db.query(Usuario)
+            .filter(Usuario.email == body.email, Usuario.id != usuario.id)
+            .first()
+        )
+        if duplicado:
+            raise _email_conflito()
+        usuario.email = body.email
+
+    if body.nome is not None:
+        usuario.nome = body.nome
+
+    if body.contato is not None:
+        professor.contato = body.contato.strip()
+
+    if body.senha is not None:
+        usuario.senha_hash = hash_senha(body.senha)
+
+    if body.situacao is not None:
+        professor.situacao = SituacaoProfessor(body.situacao)
+        usuario.ativo = body.situacao == "ATIVO"
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise _email_conflito()
+
+    db.refresh(professor)
+    return _to_response(professor)
+
+
+# ── Inativar ─────────────────────────────────────────────────────────────
+
+@router.patch(
+    "/{professor_id}/inativar",
+    response_model=ProfessorResponse,
+    summary="Inativa professor",
+    description=(
+        "Define a situação como INATIVO e desativa o login. Os lançamentos anteriores "
+        "permanecem registrados. Restrito à Coordenação."
+    ),
+)
+def inativar_professor(
+    professor_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, _somente_coordenacao],
+) -> ProfessorResponse:
+    professor = _obter_ou_404(db, professor_id)
+    professor.situacao = SituacaoProfessor.INATIVO
+    professor.usuario.ativo = False
+    db.commit()
+    db.refresh(professor)
+    return _to_response(professor)
