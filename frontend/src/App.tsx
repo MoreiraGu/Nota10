@@ -21,9 +21,22 @@ import { MeuBoletim } from './pages/aluno/MeuBoletim';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: string[] }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F6F2]">
+        <div className="text-sm font-semibold text-[#5B5645]">Carregando sessão...</div>
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(user.perfil)) {
+
+  const userPerfil = (user.perfil || '').toLowerCase();
+  const allowed = roles?.map(r => r.toLowerCase());
+
+  if (allowed && !allowed.includes(userPerfil)) {
     return (
       <AppShell>
         <div className="flex flex-col items-center justify-center py-20">
