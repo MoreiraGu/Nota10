@@ -6,14 +6,19 @@ import { formatarTelefone } from '../../utils/telefone';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Ficha, FichaIcons, FichaWatermarks } from '../../components/ui/Ficha';
+import { Modal } from '../../components/ui/Modal';
+import { useToast } from '../../components/ui/Toast';
 
 export function ProfessoresList() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [situacao, setSituacao] = useState('');
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inativarModal, setInativarModal] = useState<Professor | null>(null);
+  const [inativando, setInativando] = useState(false);
 
   const carregarProfessores = async () => {
     setLoading(true);
@@ -47,6 +52,23 @@ export function ProfessoresList() {
   });
 
   const temFiltro = !!search || !!situacao;
+
+  const handleInativar = async () => {
+    if (!inativarModal) return;
+    setInativando(true);
+    try {
+      await api.inativarProfessor(inativarModal.id);
+      setProfessores(prev =>
+        prev.map(p => (p.id === inativarModal.id ? { ...p, situacao: 'inativo' } : p))
+      );
+      setInativarModal(null);
+      toast('Professor inativado com sucesso.');
+    } catch (err: any) {
+      toast(err?.message || 'Erro ao inativar professor.', 'error');
+    } finally {
+      setInativando(false);
+    }
+  };
 
   return (
     <div>
@@ -119,10 +141,39 @@ export function ProfessoresList() {
                 { icon: FichaIcons.email, label: p.email },
                 { icon: FichaIcons.telefone, label: p.telefone || 'Não informado' },
               ]}
+              actions={
+                <>
+                  <button
+                    onClick={() => navigate(`/professores/${p.id}`)}
+                    className="text-xs font-bold hover:underline cursor-pointer"
+                    style={{ color: p.situacao === 'inativo' ? '#8A6D00' : '#3A2E00' }}
+                  >
+                    Editar
+                  </button>
+                  {p.situacao === 'ativo' && (
+                    <button
+                      onClick={() => setInativarModal(p)}
+                      className="text-xs font-semibold text-red-700 hover:underline cursor-pointer ml-auto"
+                    >
+                      Inativar
+                    </button>
+                  )}
+                </>
+              }
             />
           ))}
         </div>
       )}
+
+      <Modal open={!!inativarModal} onClose={() => setInativarModal(null)} title="Inativar professor?">
+        <p className="text-sm text-[#5B5645] mb-6">
+          O professor <strong>{inativarModal?.nome}</strong> não poderá fazer login nem ser vinculado a novas turmas. Seus lançamentos anteriores permanecerão registrados.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <Button variant="secondary" onClick={() => setInativarModal(null)}>Cancelar</Button>
+          <Button variant="destructive" loading={inativando} onClick={handleInativar}>Inativar professor</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

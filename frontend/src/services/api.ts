@@ -195,6 +195,10 @@ export const api = {
     return request<ProfessorApi[]>('/professores');
   },
 
+  async getProfessor(id: string | number) {
+    return request<ProfessorApi & { usuario_id: number }>(`/professores/${id}`);
+  },
+
   async createProfessor(data: {
     nome: string;
     email: string;
@@ -204,6 +208,41 @@ export const api = {
     return request<ProfessorApi & { usuario_id: number }>('/professores', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  async updateProfessor(
+    id: string | number,
+    data: {
+      nome?: string;
+      email?: string;
+      senha?: string;
+      contato?: string;
+      situacao?: string;
+    }
+  ) {
+    return request<ProfessorApi & { usuario_id: number }>(`/professores/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async inativarProfessor(id: string | number) {
+    return request<{
+      id: number;
+      situacao: string;
+    }>(`/professores/${id}/inativar`, {
+      method: 'PATCH',
+    });
+  },
+
+  async reativarProfessor(id: string | number) {
+    return request<{
+      id: number;
+      situacao: string;
+    }>(`/professores/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ situacao: 'ATIVO' }),
     });
   },
 };
