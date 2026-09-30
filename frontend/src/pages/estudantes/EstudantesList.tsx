@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockEstudantes } from '../../data/mockData';
 import type { Estudante } from '../../types';
+import { api } from '../../services/api';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Ficha, FichaIcons, FichaWatermarks } from '../../components/ui/Ficha';
@@ -13,9 +13,37 @@ export function EstudantesList() {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [situacao, setSituacao] = useState('');
-  const [estudantes, setEstudantes] = useState<Estudante[]>(mockEstudantes);
+  const [estudantes, setEstudantes] = useState<Estudante[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [inativarModal, setInativarModal] = useState<Estudante | null>(null);
   const [inativando, setInativando] = useState(false);
+
+  const carregarEstudantes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getEstudantes();
+      const mapped: Estudante[] = data.map(item => ({
+        id: String(item.id),
+        nome: item.nome,
+        email: item.email,
+        telefone: '',
+        curso: item.curso || `Curso #${item.curso_id}`,
+        cursoId: String(item.curso_id),
+        situacao: (item.situacao.toLowerCase() === 'ativo' ? 'ativo' : 'inativo') as 'ativo' | 'inativo',
+      }));
+      setEstudantes(mapped);
+    } catch (err: any) {
+      setError(err?.message || 'Falha ao conectar com o backend');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarEstudantes();
+  }, []);
 
   const filtered = estudantes.filter(e => {
     const matchSearch = e.nome.toLowerCase().includes(search.toLowerCase());
@@ -26,11 +54,18 @@ export function EstudantesList() {
   const handleInativar = async () => {
     if (!inativarModal) return;
     setInativando(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setEstudantes(prev => prev.map(e => e.id === inativarModal.id ? { ...e, situacao: 'inativo' } : e));
-    setInativarModal(null);
-    setInativando(false);
-    toast('Estudante inativado com sucesso.');
+    try {
+      await api.inativarEstudante(inativarModal.id);
+      setEstudantes(prev =>
+        prev.map(e => (e.id === inativarModal.id ? { ...e, situacao: 'inativo' } : e))
+      );
+      setInativarModal(null);
+      toast('Estudante inativado com sucesso.');
+    } catch (err: any) {
+      toast(err?.message || 'Erro ao inativar estudante.');
+    } finally {
+      setInativando(false);
+    }
   };
 
   return (
@@ -69,7 +104,17 @@ export function EstudantesList() {
         </span>
       </div>
 
-      {filtered.length === 0 ? (
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C]">
+          <p className="text-sm font-semibold">Carregando estudantes do banco de dados...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C]">
           <p className="text-sm">{search ? 'Nenhum estudante encontrado para esta busca.' : 'Nenhum estudante cadastrado.'}</p>
         </div>

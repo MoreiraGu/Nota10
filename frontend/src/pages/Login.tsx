@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { mockUsers } from '../data/mockData';
+import { api, ApiError } from '../services/api';
 import { Button } from '../components/ui/Button';
 
 type LoginState = 'idle' | 'loading' | 'credentials' | 'inactive' | 'validation';
@@ -49,12 +49,26 @@ export function Login() {
     e.preventDefault();
     if (!validate()) { setState('validation'); return; }
     setState('loading');
-    await new Promise(r => setTimeout(r, 1200));
-    const user = mockUsers.find(u => u.email === email && u.senha === senha);
-    if (!user) { setState('credentials'); return; }
-    if (!user.ativo) { setState('inactive'); return; }
-    login({ id: user.id, nome: user.nome, email: user.email, perfil: user.perfil, professorId: (user as any).professorId, estudanteId: (user as any).estudanteId });
-    navigate('/dashboard');
+    try {
+      const data = await api.login(email, senha);
+      const role = data.perfil.toLowerCase() as any;
+      login(
+        {
+          id: String(data.usuario_id),
+          nome: data.nome,
+          email,
+          perfil: role,
+        },
+        data.access_token
+      );
+      navigate('/dashboard');
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 403) {
+        setState('inactive');
+      } else {
+        setState('credentials');
+      }
+    }
   };
 
   return (

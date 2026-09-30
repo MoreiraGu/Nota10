@@ -1,34 +1,54 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockProfessores } from '../../data/mockData';
+import { api, ApiError } from '../../services/api';
+import { formatarTelefone } from '../../utils/telefone';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
 
 export function ProfessoresForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const isEdit = !!id;
-  const existing = isEdit ? mockProfessores.find(p => p.id === id) : null;
 
-  const [nome, setNome] = useState(existing?.nome || '');
-  const [email, setEmail] = useState(existing?.email || '');
-  const [telefone, setTelefone] = useState(existing?.telefone || '');
+  const [nome, setNome] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [inativarModal, setInativarModal] = useState(false);
-  const [inativando, setInativando] = useState(false);
+
+  // Edição e inativação de professor fazem parte da Sprint 2 (backlog #12).
+  if (id) {
+    return (
+      <div className="max-w-4xl">
+        <PageHeader
+          title="Editar professor"
+          backTo="/professores"
+          breadcrumbs={[{ label: 'Professores', href: '/professores' }, { label: 'Editar' }]}
+        />
+        <div className="card-surface p-8 text-sm text-[#5B5645]">
+          A edição e a inativação de professores ainda não estão disponíveis.
+          <div className="mt-4">
+            <Button variant="secondary" onClick={() => navigate('/professores')}>Voltar para a lista</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const clearError = (campo: string) => setErrors(prev => ({ ...prev, [campo]: '' }));
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!nome.trim()) e.nome = 'Nome completo é obrigatório.';
     if (!email.trim()) e.email = 'E-mail é obrigatório.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Informe um e-mail válido.';
-    if (!isEdit && !senha) e.senha = 'Senha é obrigatória no cadastro.';
+    if (!senha) e.senha = 'Senha é obrigatória no cadastro.';
+    else if (senha.length < 6) e.senha = 'A senha deve ter no mínimo 6 caracteres.';
+    if (senha && senha !== confirmarSenha) e.confirmarSenha = 'As senhas não conferem.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -37,27 +57,36 @@ export function ProfessoresForm() {
     ev.preventDefault();
     if (!validate()) return;
     setSaving(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setSaving(false);
-    toast(isEdit ? 'Professor atualizado com sucesso.' : 'Professor cadastrado com sucesso.');
-    navigate('/professores');
-  };
-
-  const handleInativar = async () => {
-    setInativando(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setInativando(false);
-    setInativarModal(false);
-    toast('Professor inativado com sucesso.');
-    navigate('/professores');
+    try {
+      await api.createProfessor({
+        nome: nome.trim(),
+        email: email.trim(),
+        senha,
+        contato: telefone.replace(/\D/g, ''), // salva só os dígitos
+      });
+      toast('Professor cadastrado com sucesso.');
+      navigate('/professores');
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 409) {
+        setErrors({ email: 'E-mail já cadastrado no sistema.' });
+      } else if (err instanceof ApiError && err.status === 403) {
+        toast('Somente a Coordenação pode cadastrar professores.', 'error');
+      } else if (err instanceof ApiError && err.data?.fields) {
+        setErrors(err.data.fields);
+      } else {
+        toast(err?.message || 'Erro ao cadastrar professor.', 'error');
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="max-w-4xl">
       <PageHeader
-        title={isEdit ? 'Editar professor' : 'Novo professor'}
+        title="Novo professor"
         backTo="/professores"
-        breadcrumbs={[{ label: 'Professores', href: '/professores' }, { label: isEdit ? 'Editar' : 'Novo' }]}
+        breadcrumbs={[{ label: 'Professores', href: '/professores' }, { label: 'Novo' }]}
       />
 
       <form onSubmit={handleSave}>
@@ -65,42 +94,65 @@ export function ProfessoresForm() {
           <section className="card-surface p-6">
             <h2 className="text-sm font-bold text-[#211C10] mb-4">Dados do professor</h2>
             <div className="grid gap-4">
-              <Input label="Nome completo" required value={nome} onChange={e => setNome(e.target.value)} error={errors.nome} placeholder="Nome completo do professor" />
-              <Input label="E-mail" type="email" required value={email} onChange={e => setEmail(e.target.value)} error={errors.email} placeholder="email@exemplo.com" />
-              <Input label="Telefone" value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+              <Input
+                label="Nome completo"
+                required
+                value={nome}
+                onChange={e => { setNome(e.target.value); clearError('nome'); }}
+                error={errors.nome}
+                placeholder="Nome completo do professor"
+              />
+              <Input
+                label="E-mail"
+                type="email"
+                required
+                value={email}
+                onChange={e => { setEmail(e.target.value); clearError('email'); }}
+                error={errors.email}
+                placeholder="email@exemplo.com"
+              />
+              <Input
+                label="Telefone"
+                value={telefone}
+                onChange={e => setTelefone(formatarTelefone(e.target.value))}
+                placeholder="(00) 00000-0000"
+              />
             </div>
           </section>
 
-          {!isEdit && (
-            <section className="card-surface p-6">
-              <h2 className="text-sm font-bold text-[#211C10] mb-4">Acesso</h2>
-              <Input label="Senha" type="password" required value={senha} onChange={e => setSenha(e.target.value)} error={errors.senha} placeholder="Senha de acesso" />
-            </section>
-          )}
+          <section className="card-surface p-6">
+            <h2 className="text-sm font-bold text-[#211C10] mb-4">Acesso</h2>
+            <div className="grid gap-4">
+              <Input
+                label="Senha"
+                type="password"
+                required
+                autoComplete="new-password"
+                value={senha}
+                onChange={e => { setSenha(e.target.value); clearError('senha'); }}
+                error={errors.senha}
+                placeholder="Senha de acesso"
+                hint="Mínimo de 6 caracteres."
+              />
+              <Input
+                label="Confirmar senha"
+                type="password"
+                required
+                autoComplete="new-password"
+                value={confirmarSenha}
+                onChange={e => { setConfirmarSenha(e.target.value); clearError('confirmarSenha'); }}
+                error={errors.confirmarSenha}
+                placeholder="Repita a senha"
+              />
+            </div>
+          </section>
         </div>
 
         <div className="flex items-center gap-3">
-          <Button type="submit" loading={saving}>
-            {isEdit ? 'Salvar alterações' : 'Cadastrar professor'}
-          </Button>
+          <Button type="submit" loading={saving}>Cadastrar professor</Button>
           <Button type="button" variant="secondary" onClick={() => navigate('/professores')}>Cancelar</Button>
-          {isEdit && (
-            <Button type="button" variant="destructive" className="ml-auto" onClick={() => setInativarModal(true)}>
-              Inativar professor
-            </Button>
-          )}
         </div>
       </form>
-
-      <Modal open={inativarModal} onClose={() => setInativarModal(false)} title="Inativar professor?">
-        <p className="text-sm text-[#5B5645] mb-6">
-          Um professor inativo não poderá fazer login nem ser vinculado a novas turmas. Seus lançamentos anteriores permanecerão registrados.
-        </p>
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => setInativarModal(false)}>Cancelar</Button>
-          <Button variant="destructive" loading={inativando} onClick={handleInativar}>Inativar professor</Button>
-        </div>
-      </Modal>
     </div>
   );
 }

@@ -1,21 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockProfessores } from '../../data/mockData';
 import type { Professor } from '../../types';
+import { api } from '../../services/api';
+import { formatarTelefone } from '../../utils/telefone';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Ficha, FichaIcons, FichaWatermarks } from '../../components/ui/Ficha';
-import { Modal } from '../../components/ui/Modal';
-import { useToast } from '../../components/ui/Toast';
 
 export function ProfessoresList() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [situacao, setSituacao] = useState('');
-  const [professores, setProfessores] = useState<Professor[]>(mockProfessores);
-  const [inativarModal, setInativarModal] = useState<Professor | null>(null);
-  const [inativando, setInativando] = useState(false);
+  const [professores, setProfessores] = useState<Professor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const carregarProfessores = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getProfessores();
+      setProfessores(
+        data.map(item => ({
+          id: String(item.id),
+          nome: item.nome,
+          email: item.email,
+          telefone: formatarTelefone(item.contato || ''),
+          situacao: (item.situacao.toLowerCase() === 'ativo' ? 'ativo' : 'inativo') as 'ativo' | 'inativo',
+        }))
+      );
+    } catch (err: any) {
+      setError(err?.message || 'Não foi possível carregar os professores.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarProfessores();
+  }, []);
 
   const filtered = professores.filter(p => {
     const matchSearch = p.nome.toLowerCase().includes(search.toLowerCase());
@@ -23,15 +46,7 @@ export function ProfessoresList() {
     return matchSearch && matchSituacao;
   });
 
-  const handleInativar = async () => {
-    if (!inativarModal) return;
-    setInativando(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setProfessores(prev => prev.map(p => p.id === inativarModal.id ? { ...p, situacao: 'inativo' } : p));
-    setInativarModal(null);
-    setInativando(false);
-    toast('Professor inativado com sucesso.');
-  };
+  const temFiltro = !!search || !!situacao;
 
   return (
     <div>
@@ -51,13 +66,13 @@ export function ProfessoresList() {
             placeholder="Buscar por nome..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm border-[1.5px] border-[#D2CFC7] rounded-full bg-white hover:border-[#E6A700]"
+            className="w-full pl-10 pr-4 py-2.5 text-sm border-[1.5px] border-[#D2CFC7] rounded-full bg-white hover:border-[#E6A700] focus:border-[#E6A700] transition-colors"
           />
         </div>
         <select
           value={situacao}
           onChange={e => setSituacao(e.target.value)}
-          className="px-4 py-2.5 text-sm border-[1.5px] border-[#D2CFC7] rounded-full bg-white cursor-pointer"
+          className="px-4 py-2.5 text-sm border-[1.5px] border-[#D2CFC7] rounded-full bg-white hover:border-[#E6A700] cursor-pointer"
         >
           <option value="">Todas as situações</option>
           <option value="ativo">Ativo</option>
@@ -68,9 +83,27 @@ export function ProfessoresList() {
         </span>
       </div>
 
-      {filtered.length === 0 ? (
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button onClick={carregarProfessores} className="font-semibold underline cursor-pointer shrink-0">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {loading ? (
         <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C]">
-          <p className="text-sm">{search ? 'Nenhum professor encontrado.' : 'Nenhum professor cadastrado.'}</p>
+          <p className="text-sm font-semibold">Carregando professores...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C] gap-3">
+          <p className="text-sm">
+            {temFiltro ? 'Nenhum professor encontrado para este filtro.' : 'Nenhum professor cadastrado.'}
+          </p>
+          {!temFiltro && !error && (
+            <Button size="sm" onClick={() => navigate('/professores/novo')}>Cadastrar o primeiro professor</Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -86,32 +119,10 @@ export function ProfessoresList() {
                 { icon: FichaIcons.email, label: p.email },
                 { icon: FichaIcons.telefone, label: p.telefone || 'Não informado' },
               ]}
-              actions={
-                <>
-                  <button onClick={() => navigate(`/professores/${p.id}`)} className="text-xs font-bold hover:underline cursor-pointer" style={{ color: p.situacao === 'inativo' ? '#8A6D00' : '#3A2E00' }}>
-                    Editar
-                  </button>
-                  {p.situacao === 'ativo' && (
-                    <button onClick={() => setInativarModal(p)} className="text-xs font-semibold text-red-700 hover:underline cursor-pointer ml-auto">
-                      Inativar
-                    </button>
-                  )}
-                </>
-              }
             />
           ))}
         </div>
       )}
-
-      <Modal open={!!inativarModal} onClose={() => setInativarModal(null)} title="Inativar professor?">
-        <p className="text-sm text-[#5B5645] mb-6">
-          Um professor inativo não poderá fazer login nem ser vinculado a novas turmas. Seus lançamentos anteriores permanecerão registrados.
-        </p>
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => setInativarModal(null)}>Cancelar</Button>
-          <Button variant="destructive" loading={inativando} onClick={handleInativar}>Inativar professor</Button>
-        </div>
-      </Modal>
     </div>
   );
 }
