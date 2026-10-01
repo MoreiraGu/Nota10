@@ -1,4 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+import type { ItemBoletim } from '../types';
 
 export class ApiError extends Error {
   status: number;
@@ -244,5 +245,29 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ situacao: 'ATIVO' }),
     });
+  },
+
+    // ── Aluno ──────────────────────────────────────────────────────────────
+  async getMeuBoletim(): Promise<ItemBoletim[]> {
+    const data = await request<
+      Array<{
+        turma_id: number;
+        disciplina: string;
+        notas: Array<{
+          tipo: string;
+          valor: number | null;
+        }>;
+        media: number | null;
+        frequencia: number | null;
+      }>
+    >('/alunos/me/boletim');
+
+    return data.map(item => ({
+      turmaId: String(item.turma_id),
+      disciplina: item.disciplina,
+      notas: item.notas,
+      media: item.media,
+      frequencia: item.frequencia,
+    }));
   },
 };
