@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.api.deps import get_db, require_perfil
 from app.models.frequencia import Frequencia
@@ -9,7 +10,8 @@ from app.models.matricula import Matricula
 from app.models.professor import Professor
 from app.models.turma import Turma
 from app.models.usuario import Perfil, Usuario
-from app.schemas.frequencia import FrequenciaCreate, FrequenciaResponse
+from app.schemas.frequencia import (AlunoTurmaResponse,FrequenciaCreate,FrequenciaResponse,TurmaAlunosResponse, MinhaTurmaResponse)
+from app.models.estudante import Estudante
 
 
 router = APIRouter(prefix="/turmas", tags=["Turmas"])
@@ -229,3 +231,118 @@ def obter_frequencia(
         presencas=frequencia.presencas,
         percentual=percentual,
     )
+
+@router.get(
+    "/{turma_id}/alunos",
+    response_model=TurmaAlunosResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Lista alunos matriculados na turma",
+    description=(
+        "Lista os alunos matriculados em uma turma vinculada "
+        "ao professor autenticado."
+    ),
+)
+def listar_alunos_turma(
+    turma_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[Usuario, _somente_professor],
+) -> TurmaAlunosResponse:
+
+    professor = (
+        db.query(Professor)
+        .filter(Professor.usuario_id == current_user.id)
+        .first()
+    )
+
+    if not professor:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Professor não encontrado para o usuário autenticado",
+        )
+
+    turma = (
+        db.query(Turma)
+        .filter(
+            Turma.id == turma_id,
+            Turma.professor_id == professor.id,
+        )
+        .first()
+    )
+
+    if not turma:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Professor não possui acesso a esta turma",
+        )
+
+    estudantes = (
+        db.query(Estudante)
+        .join(
+            Matricula,
+            Matricula.estudante_id == Estudante.id,
+        )
+        .filter(Matricula.turma_id == turma_id)
+        .all()
+    )
+
+    alunos = [
+        AlunoTurmaResponse(
+            aluno_id=estudante.id,
+            nome=estudante.usuario.nome,
+            email=estudante.usuario.email,
+        )
+        for estudante in estudantes
+    ]
+
+    return TurmaAlunosResponse(
+        turma_id=turma.id,
+        nome=turma.nome,
+        alunos=alunos,
+    )
+
+@router.get(
+    "/minhas",
+    response_model=list[MinhaTurmaResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Lista as turmas do professor autenticado",
+)
+def listar_minhas_turmas(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[Usuario, _somente_professor],
+) -> list[MinhaTurmaResponse]:
+
+    professor = (
+        db.query(Professor)
+        .filter(Professor.usuario_id == current_user.id)
+        .first()
+    )
+
+    if not professor:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Professor não encontrado para o usuário autenticado",
+        )
+
+    turmas = (
+        db.query(
+            Turma,
+            func.count(Matricula.id).label("total_alunos"),
+        )
+        .outerjoin(
+            Matricula,
+            Matricula.turma_id == Turma.id,
+        )
+        .filter(Turma.professor_id == professor.id)
+        .group_by(Turma.id)
+        .order_by(Turma.nome)
+        .all()
+    )
+
+    return [
+        MinhaTurmaResponse(
+            turma_id=turma.id,
+            nome=turma.nome,
+            total_alunos=total_alunos,
+        )
+        for turma, total_alunos in turmas
+    ]

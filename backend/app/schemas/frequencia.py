@@ -17,3 +17,19 @@ class FrequenciaResponse(BaseModel):
     total_aulas: int
     presencas: int
     percentual: float
+
+class AlunoTurmaResponse(BaseModel):
+    aluno_id: int
+    nome: str
+    email: str
+
+
+class TurmaAlunosResponse(BaseModel):
+    turma_id: int
+    nome: str
+    alunos: list[AlunoTurmaResponse]
+
+class MinhaTurmaResponse(BaseModel):
+    turma_id: int
+    nome: str
+    total_alunos: int
