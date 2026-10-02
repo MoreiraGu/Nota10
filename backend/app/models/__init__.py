@@ -5,3 +5,4 @@ from app.models.professor import Professor  # noqa: F401
 from app.models.turma import Turma  # noqa: F401
 from app.models.matricula import Matricula  # noqa: F401
 from app.models.frequencia import Frequencia  # noqa: F401
+from app.models.disciplina import Disciplina
