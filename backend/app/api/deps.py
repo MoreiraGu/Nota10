@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decodificar_token
 from app.models.usuario import Perfil, Usuario
+from app.models.professor import Professor
+from app.models.turma import Turma
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -54,3 +56,43 @@ def require_perfil(*perfis: Perfil):
         return current_user
 
     return _check
+
+def requires_vinculo_turma(
+    turma_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[
+        Usuario,
+        Depends(require_perfil(Perfil.PROFESSOR)),
+    ],
+) -> Turma:
+    professor = (
+        db.query(Professor)
+        .filter(Professor.usuario_id == current_user.id)
+        .first()
+    )
+
+    if professor is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário não possui cadastro de professor",
+        )
+
+    turma = (
+        db.query(Turma)
+        .filter(Turma.id == turma_id)
+        .first()
+    )
+
+    if turma is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Turma não encontrada",
+        )
+
+    if turma.professor_id != professor.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Professor não possui vínculo com esta turma",
+        )
+
+    return turma
