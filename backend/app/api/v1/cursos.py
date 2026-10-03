@@ -43,4 +43,4 @@ def listar_cursos(
     _: Annotated[Usuario, _somente_coordenacao],
 ) -> list[CursoResponse]:
     cursos = db.query(Curso).order_by(Curso.nome).all()
-    return [CursoResponse.model_validate(curso) for curso in cursos]
+    return [CursoResponse(id=c.id, nome=c.nome) for c in cursos]

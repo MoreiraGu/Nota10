@@ -88,8 +88,12 @@ export interface Frequencia {
 }
 
 export interface ItemBoletim {
+  turmaId: string;
   disciplina: string;
-  notas: { tipo: string; valor: number | null }[];
+  notas: {
+    tipo: string;
+    valor: number | null;
+  }[];
   media: number | null;
   frequencia: number | null;
 }
