@@ -17,10 +17,6 @@ class Disciplina(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(200), nullable=False)
     curso_id = Column(Integer, ForeignKey("cursos.id"), nullable=False, index=True)
-    situacao = Column(
-        Enum(SituacaoDisciplina),
-        default=SituacaoDisciplina.ATIVA,
-        nullable=False,
-    )
+    situacao = Column(Enum(SituacaoDisciplina), default=SituacaoDisciplina.ATIVA, nullable=False)
 
     curso = relationship("Curso", lazy="joined")

@@ -99,6 +99,39 @@ export const api = {
     return request<Array<{ id: number; nome: string }>>('/cursos');
   },
 
+  async createCurso(data: { nome: string }) {
+    return request<{ id: number; nome: string }>('/cursos', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ── Disciplinas ───────────────────────────────────────────────────────
+  async getDisciplinas() {
+    return request<
+      Array<{
+        id: number;
+        nome: string;
+        curso_id: number;
+        curso: string;
+        situacao: 'ATIVA' | 'INATIVA';
+      }>
+    >('/disciplinas');
+  },
+
+  async createDisciplina(data: { nome: string; curso_id: number }) {
+    return request<{
+      id: number;
+      nome: string;
+      curso_id: number;
+      curso: string;
+      situacao: 'ATIVA' | 'INATIVA';
+    }>('/disciplinas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // ── Estudantes ─────────────────────────────────────────────────────────
   async getEstudantes() {
     return request<

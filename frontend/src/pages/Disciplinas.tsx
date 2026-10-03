@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { mockDisciplinas, mockCursos } from '../data/mockData';
+import { useEffect, useState } from 'react';
 import type { Disciplina } from '../types';
+import { api } from '../services/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
@@ -8,51 +8,100 @@ import { Ficha, FichaIcons, FichaWatermarks } from '../components/ui/Ficha';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 
+interface CursoOption {
+  id: number;
+  nome: string;
+}
+
 export function Disciplinas() {
   const { toast } = useToast();
-  const [disciplinas, setDisciplinas] = useState<Disciplina[]>(mockDisciplinas);
+  const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
+  const [cursos, setCursos] = useState<CursoOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [createModal, setCreateModal] = useState(false);
   const [nome, setNome] = useState('');
   const [cursoId, setCursoId] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  const carregarDados = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [disciplinasData, cursosData] = await Promise.all([
+        api.getDisciplinas(),
+        api.getCursos(),
+      ]);
+
+      setCursos(cursosData);
+      setDisciplinas(
+        disciplinasData.map(item => ({
+          id: String(item.id),
+          nome: item.nome,
+          cursoId: String(item.curso_id),
+          curso: item.curso,
+          situacao: item.situacao === 'ATIVA' ? 'ativa' : 'inativa',
+          temTurmaAtiva: false,
+          temNotas: false,
+        }))
+      );
+    } catch (err: any) {
+      setError(err?.message || 'Não foi possível carregar as disciplinas.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!nome.trim()) errs.nome = 'Nome é obrigatório.';
     if (!cursoId) errs.cursoId = 'Selecione um curso.';
-    if (Object.keys(errs).length) { setFormErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setFormErrors(errs);
+      return;
+    }
+
     setSaving(true);
-    await new Promise(r => setTimeout(r, 900));
-    const curso = mockCursos.find(c => c.id === cursoId)!;
-    setDisciplinas(prev => [...prev, {
-      id: `d${Date.now()}`,
-      nome: nome.trim(),
-      cursoId,
-      curso: curso.nome,
-      situacao: 'ativa',
-      temTurmaAtiva: false,
-      temNotas: false,
-    }]);
-    setSaving(false);
+    try {
+      const criada = await api.createDisciplina({
+        nome: nome.trim(),
+        curso_id: Number(cursoId),
+      });
+
+      const nova: Disciplina = {
+        id: String(criada.id),
+        nome: criada.nome,
+        cursoId: String(criada.curso_id),
+        curso: criada.curso,
+        situacao: criada.situacao === 'ATIVA' ? 'ativa' : 'inativa',
+        temTurmaAtiva: false,
+        temNotas: false,
+      };
+
+      setDisciplinas(prev => [...prev, nova].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setCreateModal(false);
+      setNome('');
+      setCursoId('');
+      setFormErrors({});
+      toast('Disciplina criada com sucesso.');
+    } catch (err: any) {
+      toast(err?.message || 'Erro ao criar disciplina.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeModal = () => {
     setCreateModal(false);
-    setNome(''); setCursoId(''); setFormErrors({});
-    toast('Disciplina criada com sucesso.');
-  };
-
-  const handleInativar = async (d: Disciplina) => {
-    await new Promise(r => setTimeout(r, 500));
-    setDisciplinas(prev => prev.map(x => x.id === d.id ? { ...x, situacao: 'inativa' } : x));
-    toast('Disciplina inativada.');
-  };
-
-  const canDelete = (d: Disciplina) => !d.temTurmaAtiva && !d.temNotas;
-
-  const handleDelete = async (d: Disciplina) => {
-    if (!canDelete(d)) return;
-    setDisciplinas(prev => prev.filter(x => x.id !== d.id));
-    toast('Disciplina excluída.');
+    setNome('');
+    setCursoId('');
+    setFormErrors({});
   };
 
   return (
@@ -63,9 +112,25 @@ export function Disciplinas() {
         action={<Button onClick={() => setCreateModal(true)}>+ Nova disciplina</Button>}
       />
 
-      {disciplinas.length === 0 ? (
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button onClick={carregarDados} className="font-semibold underline cursor-pointer shrink-0">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {loading ? (
         <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C]">
+          <p className="text-sm font-semibold">Carregando disciplinas...</p>
+        </div>
+      ) : disciplinas.length === 0 ? (
+        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C] gap-3">
           <p className="text-sm">Nenhuma disciplina cadastrada.</p>
+          {!error && cursos.length > 0 && (
+            <Button size="sm" onClick={() => setCreateModal(true)}>Cadastrar a primeira disciplina</Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -79,46 +144,38 @@ export function Disciplinas() {
               status={{ label: d.situacao === 'ativa' ? 'Ativa' : 'Inativa', tone: d.situacao === 'ativa' ? 'ok' : 'off' }}
               stats={[
                 { icon: FichaIcons.curso, label: d.curso },
-                { icon: FichaIcons.turma, label: d.temTurmaAtiva ? 'Possui turma ativa' : 'Sem turma ativa' },
               ]}
-              actions={
-                <>
-                  {d.situacao === 'ativa' && (
-                    <button onClick={() => handleInativar(d)} className="text-xs font-semibold hover:underline cursor-pointer" style={{ color: '#8A6D00' }}>
-                      Inativar
-                    </button>
-                  )}
-                  <div className="relative group ml-auto">
-                    <button
-                      onClick={() => handleDelete(d)}
-                      disabled={!canDelete(d)}
-                      className={`text-xs font-semibold cursor-pointer ${canDelete(d) ? 'text-red-700 hover:underline' : 'text-[#A99A55] cursor-not-allowed'}`}
-                    >
-                      Excluir
-                    </button>
-                    {!canDelete(d) && (
-                      <div className="hidden group-hover:block absolute right-0 bottom-6 w-56 bg-[#211C10] text-white text-xs px-3 py-2 rounded-[8px] shadow-lg z-10 leading-relaxed">
-                        Não é possível excluir: possui turma ativa ou notas lançadas.
-                      </div>
-                    )}
-                  </div>
-                </>
-              }
             />
           ))}
         </div>
       )}
 
-      <Modal open={createModal} onClose={() => { setCreateModal(false); setNome(''); setCursoId(''); setFormErrors({}); }} title="Nova disciplina">
+      <Modal open={createModal} onClose={closeModal} title="Nova disciplina">
         <form onSubmit={handleCreate} className="space-y-4">
-          <Input label="Nome" required value={nome} onChange={e => { setNome(e.target.value); setFormErrors(prev => ({ ...prev, nome: '' })); }} error={formErrors.nome} placeholder="Ex: Programação Web" />
-          <Select label="Curso" required value={cursoId} onChange={e => { setCursoId(e.target.value); setFormErrors(prev => ({ ...prev, cursoId: '' })); }} error={formErrors.cursoId}>
+          <Input
+            label="Nome"
+            required
+            value={nome}
+            onChange={e => { setNome(e.target.value); setFormErrors(prev => ({ ...prev, nome: '' })); }}
+            error={formErrors.nome}
+            placeholder="Ex: Programação Web"
+          />
+          <Select
+            label="Curso"
+            required
+            value={cursoId}
+            onChange={e => { setCursoId(e.target.value); setFormErrors(prev => ({ ...prev, cursoId: '' })); }}
+            error={formErrors.cursoId}
+          >
             <option value="">Selecione um curso</option>
-            {mockCursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </Select>
+          {cursos.length === 0 && (
+            <p className="text-xs text-[#8A6D00]">Cadastre um curso antes de criar uma disciplina.</p>
+          )}
           <div className="flex gap-2 justify-end pt-2">
-            <Button type="button" variant="secondary" onClick={() => setCreateModal(false)}>Cancelar</Button>
-            <Button type="submit" loading={saving}>Criar disciplina</Button>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancelar</Button>
+            <Button type="submit" loading={saving} disabled={cursos.length === 0}>Criar disciplina</Button>
           </div>
         </form>
       </Modal>
