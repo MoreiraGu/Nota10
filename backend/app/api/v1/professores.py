@@ -8,6 +8,8 @@ from app.api.deps import get_db, require_perfil
 from app.core.security import hash_senha
 from app.models.professor import Professor, SituacaoProfessor
 from app.models.usuario import Perfil, Usuario
+from app.models.turma import Turma
+from app.schemas.turma import TurmaProfessorResponse
 from app.schemas.professor import (
     ProfessorCreate,
     ProfessorListItem,
@@ -118,6 +120,43 @@ def listar_professores(
         )
         for p in professores
     ]
+
+# ── Minhas turmas ───────────────────────────────────────────────────────
+
+@router.get(
+    "/me/turmas",
+    response_model=list[TurmaProfessorResponse],
+    summary="Lista as turmas do professor logado",
+    description=(
+        "Retorna somente as turmas vinculadas ao professor autenticado. "
+        "O professor é identificado pelo token; não é necessário informar seu ID."
+    ),
+)
+def listar_minhas_turmas(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[
+        Usuario,
+        Depends(require_perfil(Perfil.PROFESSOR)),
+    ],
+) -> list[TurmaProfessorResponse]:
+    professor = (
+        db.query(Professor)
+        .filter(Professor.usuario_id == current_user.id)
+        .first()
+    )
+
+    if professor is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário não possui cadastro de professor",
+        )
+
+    return (
+        db.query(Turma)
+        .filter(Turma.professor_id == professor.id)
+        .order_by(Turma.id)
+        .all()
+    )
 
 
 # ── Obter ────────────────────────────────────────────────────────────────
