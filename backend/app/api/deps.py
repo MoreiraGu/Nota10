@@ -25,13 +25,17 @@ def get_current_user(
     )
     try:
         payload = decodificar_token(token)
-        usuario_id: int | None = payload.get("sub")
-        if usuario_id is None:
+
+        usuario_id_raw = payload.get("sub")
+        if usuario_id_raw is None:
             raise credentials_exception
-    except JWTError:
+
+        usuario_id = int(usuario_id_raw)
+
+    except (JWTError, ValueError, TypeError):
         raise credentials_exception
 
-    usuario = db.query(Usuario).filter(Usuario.id == int(usuario_id)).first()
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if usuario is None:
         raise credentials_exception
     if not usuario.ativo:
