@@ -30,7 +30,6 @@ class Matricula(Base):
         Integer,
         ForeignKey("turmas.id"),
         nullable=False,
-        index=True,
     )
 
     data_matricula = Column(

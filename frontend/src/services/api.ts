@@ -69,6 +69,32 @@ export interface ProfessorApi {
   situacao: string;
 }
 
+export interface AlunoTurmaApi {
+  aluno_id: number;
+  nome: string;
+  email: string;
+}
+
+export interface TurmaAlunosApi {
+  turma_id: number;
+  nome: string;
+  alunos: AlunoTurmaApi[];
+}
+
+export interface FrequenciaApi {
+  turma_id: number;
+  aluno_id: number;
+  total_aulas: number;
+  presencas: number;
+  percentual: number;
+}
+
+export interface MinhaTurmaApi {
+  turma_id: number;
+  nome: string;
+  total_alunos: number;
+}
+
 export const api = {
   // ── Autenticação ───────────────────────────────────────────────────────
   async login(email: string, senha: string) {
@@ -278,6 +304,44 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ situacao: 'ATIVO' }),
     });
+  },
+
+    // ── Turmas / Frequência ───────────────────────────────────────────────
+
+  async getAlunosTurma(turmaId: string | number) {
+    return request<TurmaAlunosApi>(
+      `/turmas/${turmaId}/alunos`
+    );
+  },
+
+  async getFrequencia(
+    turmaId: string | number,
+    alunoId: string | number
+  ) {
+    return request<FrequenciaApi>(
+      `/turmas/${turmaId}/alunos/${alunoId}/frequencia`
+    );
+  },
+
+  async lancarFrequencia(
+    turmaId: string | number,
+    data: {
+      aluno_id: number;
+      total_aulas: number;
+      presencas: number;
+    }
+  ) {
+    return request<FrequenciaApi>(
+      `/turmas/${turmaId}/frequencia`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  async getMinhasTurmas() {
+  return request<MinhaTurmaApi[]>('/turmas/minhas');
   },
 
     // ── Aluno ──────────────────────────────────────────────────────────────
