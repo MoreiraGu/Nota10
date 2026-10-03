@@ -7,9 +7,15 @@ class Turma(Base):
     __tablename__ = "turmas"
 
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String(200), nullable=False)
+
+    nome = Column(
+        String(200),
+        nullable=False,
+    )
+
     professor_id = Column(
         Integer,
         ForeignKey("professores.id"),
         nullable=False,
+        index=True,
     )
