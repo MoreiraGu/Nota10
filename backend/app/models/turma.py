@@ -32,3 +32,14 @@ class Turma(Base):
     )
 
     disciplina = relationship("Disciplina", lazy="joined")
+    nome = Column(
+        String(200),
+        nullable=False,
+    )
+
+    professor_id = Column(
+        Integer,
+        ForeignKey("professores.id"),
+        nullable=False,
+        index=True,
+    )
