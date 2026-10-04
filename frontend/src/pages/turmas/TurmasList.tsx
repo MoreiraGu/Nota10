@@ -1,16 +1,54 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockTurmas } from '../../data/mockData';
+import { ApiError, api } from '../../services/api';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Ficha, FichaIcons, FichaWatermarks } from '../../components/ui/Ficha';
+import { useToast } from '../../components/ui/Toast';
+
+interface TurmaItem {
+  id: number;
+  disciplina_id: number;
+  periodo_letivo: string;
+  situacao: string;
+}
 
 export function TurmasList() {
   const navigate = useNavigate();
-  const [periodo, setPeriodo] = useState('');
+  const { toast } = useToast();
 
-  const periodos = Array.from(new Set(mockTurmas.map(t => t.periodoLetivo))).sort().reverse();
-  const filtered = mockTurmas.filter(t => !periodo || t.periodoLetivo === periodo);
+  const [turmas, setTurmas] = useState<TurmaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [periodo, setPeriodo] = useState('');
+  const [disciplinasMap, setDisciplinasMap] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    async function carregar() {
+      try {
+        setLoading(true);
+        const [disciplinasData] = await Promise.all([
+          api.getDisciplinas(),
+        ]);
+        // Monta mapa id→nome de disciplinas
+        const mapa: Record<number, string> = {};
+        disciplinasData.forEach(d => { mapa[d.id] = d.nome; });
+        setDisciplinasMap(mapa);
+
+        // Não há GET /turmas público ainda — Coordenação vê via lista de disciplinas por enquanto
+        // Esse endpoint será adicionado quando houver necessidade de listagem global
+        setTurmas([]);
+      } catch (e) {
+        if (e instanceof ApiError) toast(e.message, 'error');
+        else toast('Não foi possível carregar as turmas.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+    carregar();
+  }, [toast]);
+
+  const periodos = Array.from(new Set(turmas.map(t => t.periodo_letivo))).sort().reverse();
+  const filtered = turmas.filter(t => !periodo || t.periodo_letivo === periodo);
 
   return (
     <div>
@@ -28,7 +66,7 @@ export function TurmasList() {
         >
           <option value="">Todos os períodos</option>
           {periodos.map(p => (
-            <option key={p} value={p}>{p}{p === '2026.2' ? ' (atual)' : ''}</option>
+            <option key={p} value={p}>{p}</option>
           ))}
         </select>
         <span className="text-xs font-semibold text-[#948F7C] ml-auto">
@@ -36,26 +74,34 @@ export function TurmasList() {
         </span>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C]">
+      {loading ? (
+        <div className="card-surface-plain flex items-center justify-center py-16 text-[#948F7C]">
+          <p className="text-sm font-medium">Carregando turmas...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C] gap-3">
           <p className="text-sm">Nenhuma turma encontrada.</p>
+          <Button size="sm" onClick={() => navigate('/turmas/novo')}>Criar primeira turma</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(t => (
             <Ficha
               key={t.id}
-              eyebrow={t.periodoLetivo === '2026.2' ? 'Período atual' : t.periodoLetivo}
-              title={t.disciplina}
-              muted={t.situacao !== 'ativa'}
+              eyebrow={t.periodo_letivo}
+              title={disciplinasMap[t.disciplina_id] || `Disciplina #${t.disciplina_id}`}
+              muted={t.situacao !== 'ATIVA'}
               watermark={FichaWatermarks.turma}
-              status={{ label: t.situacao === 'ativa' ? 'Ativa' : 'Encerrada', tone: t.situacao === 'ativa' ? 'ok' : 'off' }}
+              status={{ label: t.situacao === 'ATIVA' ? 'Ativa' : 'Encerrada', tone: t.situacao === 'ATIVA' ? 'ok' : 'off' }}
               stats={[
-                { icon: FichaIcons.calendario, label: `Período ${t.periodoLetivo}` },
-                { icon: FichaIcons.turma, label: `${t.totalAlunos} aluno${t.totalAlunos !== 1 ? 's' : ''} matriculado${t.totalAlunos !== 1 ? 's' : ''}` },
+                { icon: FichaIcons.calendario, label: `Período ${t.periodo_letivo}` },
               ]}
               actions={
-                <button onClick={() => navigate(`/turmas/${t.id}`)} className="text-xs font-bold hover:underline cursor-pointer" style={{ color: t.situacao !== 'ativa' ? '#8A6D00' : '#3A2E00' }}>
+                <button
+                  onClick={() => navigate(`/turmas/${t.id}`)}
+                  className="text-xs font-bold hover:underline cursor-pointer"
+                  style={{ color: '#3A2E00' }}
+                >
                   Ver detalhes →
                 </button>
               }

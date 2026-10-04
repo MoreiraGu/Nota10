@@ -10,6 +10,7 @@ Critérios de aceite:
 """
 
 import os
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,6 +28,7 @@ from app.models.estudante import Estudante
 from app.models.frequencia import Frequencia
 from app.models.matricula import Matricula
 from app.models.nota import Nota
+from app.models.professor import Professor
 from app.models.turma import Turma
 from app.models.usuario import Perfil, Usuario
 
@@ -223,14 +225,32 @@ def _matricular(db, estudante, turma):
     return matricula
 
 
+def _criar_professor_simples(db) -> Professor:
+    """Cria professor mínimo para ser registrado como lançador de nota."""
+    uid = uuid.uuid4().hex[:8]
+    usuario_prof = _criar_usuario(db, f"Prof Teste {uid}", f"prof.{uid}@test.com", Perfil.PROFESSOR)
+    professor = Professor(usuario_id=usuario_prof.id)
+    db.add(professor)
+    db.commit()
+    db.refresh(professor)
+    return professor
+
+
 def _adicionar_nota(
     db,
     matricula,
     tipo,
     valor,
+    professor=None,
 ):
+    if professor is None:
+        professor = _criar_professor_simples(db)
+
     nota = Nota(
-        matricula_id=matricula.id,
+        aluno_id=matricula.estudante_id,
+        disciplina_id=matricula.turma.disciplina_id,
+        turma_id=matricula.turma_id,
+        professor_lancador_id=professor.id,
         tipo_avaliacao=tipo,
         valor=valor,
         peso=1.0,
@@ -250,9 +270,10 @@ def _adicionar_frequencia(
     total_presencas,
 ):
     frequencia = Frequencia(
-        matricula_id=matricula.id,
+        turma_id=matricula.turma_id,
+        estudante_id=matricula.estudante_id,
         total_aulas=total_aulas,
-        total_presencas=total_presencas,
+        presencas=total_presencas,
     )
 
     db.add(frequencia)
@@ -431,7 +452,7 @@ class TestConsultarBoletim:
             },
         ]
 
-        assert item["media"] == 7.8
+        assert item["media"] == 7.75  # MediaPonderada: (8.5*1 + 7.0*1) / 2 = 7.75
         assert item["frequencia"] == 90.0
 
 
