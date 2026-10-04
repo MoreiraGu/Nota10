@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import datetime
 
-from sqlalchemy import Column, Date, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -30,13 +30,14 @@ class Matricula(Base):
         Integer,
         ForeignKey("turmas.id"),
         nullable=False,
+        index=True,
     )
 
     data_matricula = Column(
-        Date,
-        default=date.today,
+        DateTime,
+        default=datetime.utcnow,
         nullable=False,
     )
 
     estudante = relationship("Estudante", lazy="joined")
-    turma = relationship("Turma", lazy="joined")
+    turma = relationship("Turma", back_populates="matriculas", lazy="joined")

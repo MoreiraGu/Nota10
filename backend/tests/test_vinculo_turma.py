@@ -1,3 +1,8 @@
+"""Testes de integração — dependency requires_vinculo_turma (ACAD-10 / RBAC por recurso).
+
+Verifica que apenas o professor vinculado à turma via turma_professores
+consegue operar na turma.
+"""
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
@@ -6,8 +11,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import requires_vinculo_turma
 from app.core.database import Base
+from app.models.disciplina import Disciplina
+from app.models.curso import Curso
 from app.models.professor import Professor
 from app.models.turma import Turma
+from app.models.turma_professor import TurmaProfessor
 from app.models.usuario import Perfil, Usuario
 
 
@@ -34,11 +42,13 @@ def setup_db():
 @pytest.fixture
 def db():
     session = TestingSessionLocal()
-
     try:
         yield session
     finally:
         session.close()
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 
 def criar_professor(db, nome: str, email: str):
@@ -52,40 +62,45 @@ def criar_professor(db, nome: str, email: str):
     db.add(usuario)
     db.flush()
 
-    professor = Professor(
-        usuario_id=usuario.id,
-    )
+    professor = Professor(usuario_id=usuario.id)
     db.add(professor)
     db.flush()
 
     return usuario, professor
 
 
-def criar_turma(db, nome: str, professor_id: int):
-    turma = Turma(
-        nome=nome,
-        professor_id=professor_id,
-    )
+def criar_turma(db, nome_disciplina: str = "Web"):
+    curso = Curso(nome="DSM")
+    db.add(curso)
+    db.flush()
+
+    disciplina = Disciplina(nome=nome_disciplina, curso_id=curso.id)
+    db.add(disciplina)
+    db.flush()
+
+    turma = Turma(disciplina_id=disciplina.id, periodo_letivo="2026.2")
     db.add(turma)
     db.flush()
 
     return turma
 
 
+def vincular(db, turma, professor):
+    vinculo = TurmaProfessor(turma_id=turma.id, professor_id=professor.id)
+    db.add(vinculo)
+    db.flush()
+    return vinculo
+
+
+# ── Testes ───────────────────────────────────────────────────────────────────
+
+
 class TestRequiresVinculoTurma:
 
     def test_professor_vinculado_pode_acessar_turma(self, db):
-        usuario, professor = criar_professor(
-            db,
-            nome="Professor Um",
-            email="prof1@test.com",
-        )
-
-        turma = criar_turma(
-            db,
-            nome="Turma do Professor Um",
-            professor_id=professor.id,
-        )
+        usuario, professor = criar_professor(db, "Professor Um", "prof1@test.com")
+        turma = criar_turma(db)
+        vincular(db, turma, professor)
 
         resultado = requires_vinculo_turma(
             turma_id=turma.id,
@@ -94,30 +109,17 @@ class TestRequiresVinculoTurma:
         )
 
         assert resultado.id == turma.id
-        assert resultado.professor_id == professor.id
 
     def test_professor_nao_vinculado_recebe_403(self, db):
-        usuario_1, professor_1 = criar_professor(
-            db,
-            nome="Professor Um",
-            email="prof1@test.com",
-        )
+        usuario_1, professor_1 = criar_professor(db, "Professor Um", "prof1@test.com")
+        _, professor_2 = criar_professor(db, "Professor Dois", "prof2@test.com")
 
-        _, professor_2 = criar_professor(
-            db,
-            nome="Professor Dois",
-            email="prof2@test.com",
-        )
-
-        turma_professor_2 = criar_turma(
-            db,
-            nome="Turma do Professor Dois",
-            professor_id=professor_2.id,
-        )
+        turma = criar_turma(db)
+        vincular(db, turma, professor_2)  # apenas professor_2 vinculado
 
         with pytest.raises(HTTPException) as exc:
             requires_vinculo_turma(
-                turma_id=turma_professor_2.id,
+                turma_id=turma.id,
                 db=db,
                 current_user=usuario_1,
             )
@@ -126,11 +128,7 @@ class TestRequiresVinculoTurma:
         assert exc.value.detail == "Professor não possui vínculo com esta turma"
 
     def test_turma_inexistente_retorna_404(self, db):
-        usuario, _ = criar_professor(
-            db,
-            nome="Professor Um",
-            email="prof1@test.com",
-        )
+        usuario, _ = criar_professor(db, "Professor Um", "prof1@test.com")
 
         with pytest.raises(HTTPException) as exc:
             requires_vinculo_turma(
@@ -150,7 +148,6 @@ class TestRequiresVinculoTurma:
             perfil=Perfil.PROFESSOR,
             ativo=True,
         )
-
         db.add(usuario)
         db.flush()
 

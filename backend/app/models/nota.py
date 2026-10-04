@@ -1,42 +1,55 @@
-from sqlalchemy import Column, Float, ForeignKey, Integer, String
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
 
 class Nota(Base):
+    """Nota lançada pelo professor. Vincula aluno + turma + disciplina.
+    Professor lançador é sempre registrado para rastreabilidade (spec seção 23)."""
+
     __tablename__ = "notas"
 
     id = Column(Integer, primary_key=True, index=True)
 
-    matricula_id = Column(
+    aluno_id = Column(
         Integer,
-        ForeignKey("matriculas.id"),
+        ForeignKey("estudantes.id"),
         nullable=False,
         index=True,
     )
 
-    tipo_avaliacao = Column(
-        String(100),
+    disciplina_id = Column(
+        Integer,
+        ForeignKey("disciplinas.id"),
         nullable=False,
+        index=True,
     )
 
-    peso = Column(
-        Float,
-        default=1.0,
+    turma_id = Column(
+        Integer,
+        ForeignKey("turmas.id"),
         nullable=False,
+        index=True,
     )
 
-    valor = Column(
-        Float,
-        nullable=True,
-    )
-
-    professor_id = Column(
+    professor_lancador_id = Column(
         Integer,
         ForeignKey("professores.id"),
-        nullable=True,
+        nullable=False,
     )
 
-    matricula = relationship("Matricula")
-    professor = relationship("Professor")
+    tipo_avaliacao = Column(String(100), nullable=False)
+
+    peso = Column(Float, nullable=False, default=1.0)
+
+    valor = Column(Float, nullable=True)
+
+    data_lancamento = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    aluno = relationship("Estudante", lazy="joined")
+    disciplina = relationship("Disciplina", lazy="joined")
+    turma = relationship("Turma")
+    professor_lancador = relationship("Professor")

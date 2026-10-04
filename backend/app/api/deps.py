@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decodificar_token
-from app.models.usuario import Perfil, Usuario
 from app.models.professor import Professor
 from app.models.turma import Turma
+from app.models.turma_professor import TurmaProfessor
+from app.models.usuario import Perfil, Usuario
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -57,6 +58,7 @@ def require_perfil(*perfis: Perfil):
 
     return _check
 
+
 def requires_vinculo_turma(
     turma_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -65,6 +67,8 @@ def requires_vinculo_turma(
         Depends(require_perfil(Perfil.PROFESSOR)),
     ],
 ) -> Turma:
+    """Dependency de RBAC por recurso (spec seção 21).
+    Garante que o professor autenticado está vinculado à turma via turma_professores."""
     professor = (
         db.query(Professor)
         .filter(Professor.usuario_id == current_user.id)
@@ -89,7 +93,16 @@ def requires_vinculo_turma(
             detail="Turma não encontrada",
         )
 
-    if turma.professor_id != professor.id:
+    vinculo = (
+        db.query(TurmaProfessor)
+        .filter(
+            TurmaProfessor.turma_id == turma_id,
+            TurmaProfessor.professor_id == professor.id,
+        )
+        .first()
+    )
+
+    if vinculo is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Professor não possui vínculo com esta turma",
