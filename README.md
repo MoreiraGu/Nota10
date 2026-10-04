@@ -138,7 +138,7 @@ Por padrão, a aplicação utiliza **SQLite** (`nota10.db`) para rodar imediatam
 docker compose up -d
 ```
 E ajuste o `DATABASE_URL` no `backend/.env` para:
-`postgresql://postgres:postgrespassword@localhost:5432/nota10_db`
+`postgresql+psycopg2://postgres:postgrespassword@localhost:5433/nota10_db`
 
 ---
 
