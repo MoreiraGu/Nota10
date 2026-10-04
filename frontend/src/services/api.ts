@@ -341,7 +341,79 @@ export const api = {
   },
 
   async getMinhasTurmas() {
-  return request<MinhaTurmaApi[]>('/turmas/minhas');
+    return request<MinhaTurmaApi[]>('/turmas/minhas');
+  },
+
+  // ── Turmas (Coordenação) ────────────────────────────────────────────────
+
+  async createTurma(data: { disciplina_id: number; periodo_letivo: string }) {
+    return request<{
+      id: number;
+      disciplina_id: number;
+      periodo_letivo: string;
+      situacao: string;
+    }>('/turmas', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  async getTurma(id: string | number) {
+    return request<{
+      id: number;
+      disciplina_id: number;
+      periodo_letivo: string;
+      situacao: string;
+      professores: Array<{ id: number; nome: string }>;
+      alunos: Array<{ id: number; nome: string }>;
+    }>(`/turmas/${id}`);
+  },
+
+  async vincularProfessor(turmaId: string | number, professorId: number) {
+    return request<{ id: number; turma_id: number; professor_id: number }>(
+      `/turmas/${turmaId}/professores`,
+      { method: 'POST', body: JSON.stringify({ professor_id: professorId }) }
+    );
+  },
+
+  async matricularAluno(turmaId: string | number, alunoId: number) {
+    return request<{
+      id: number;
+      turma_id: number;
+      aluno_id: number;
+      data_matricula: string;
+    }>(`/turmas/${turmaId}/matriculas`, {
+      method: 'POST',
+      body: JSON.stringify({ aluno_id: alunoId }),
+    });
+  },
+
+  // ── Notas ──────────────────────────────────────────────────────────────
+
+  async lancarNota(
+    turmaId: string | number,
+    data: { aluno_id: number; tipo_avaliacao: string; peso: number; valor: number }
+  ) {
+    return request<{
+      id: number;
+      aluno_id: number;
+      disciplina_id: number;
+      turma_id: number;
+      tipo_avaliacao: string;
+      peso: number;
+      valor: number;
+      professor_lancador_id: number;
+      data_lancamento: string;
+    }>(`/turmas/${turmaId}/notas`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getMedia(turmaId: string | number, alunoId: string | number) {
+    return request<{
+      aluno_id: number;
+      disciplina_id: number;
+      notas: Array<{ tipo_avaliacao: string; peso: number; valor: number | null }>;
+      media_final: number | null;
+    }>(`/turmas/${turmaId}/alunos/${alunoId}/media`);
   },
 
     // ── Aluno ──────────────────────────────────────────────────────────────
