@@ -168,6 +168,79 @@ class TestCriarTurma:
         })
         assert resp.status_code == 401
 
+class TestListarTurmas:
+
+    def test_coordenacao_lista_turmas(self, client, db):
+        coord = _usuario(
+            db,
+            "Coord",
+            "coord.lista@test.com",
+            Perfil.COORDENACAO,
+        )
+
+        headers = _headers(coord)
+
+        curso = _curso(db)
+        disciplina = _disciplina(db, curso)
+
+        primeira = client.post(
+            "/api/v1/turmas",
+            json={
+                "disciplina_id": disciplina.id,
+                "periodo_letivo": "2026.1",
+            },
+            headers=headers,
+        )
+
+        segunda = client.post(
+            "/api/v1/turmas",
+            json={
+                "disciplina_id": disciplina.id,
+                "periodo_letivo": "2026.2",
+            },
+            headers=headers,
+        )
+
+        assert primeira.status_code == 201
+        assert segunda.status_code == 201
+
+        resp = client.get(
+            "/api/v1/turmas",
+            headers=headers,
+        )
+
+        assert resp.status_code == 200
+
+        data = resp.json()
+
+        assert len(data) == 2
+
+        ids = {turma["id"] for turma in data}
+
+        assert primeira.json()["id"] in ids
+        assert segunda.json()["id"] in ids
+
+
+    def test_professor_nao_pode_listar_todas_as_turmas(
+        self,
+        client,
+        db,
+    ):
+        professor, _ = _professor(db)
+
+        resp = client.get(
+            "/api/v1/turmas",
+            headers=_headers(professor),
+        )
+
+        assert resp.status_code == 403
+
+
+    def test_sem_token_retorna_401(self, client):
+        resp = client.get("/api/v1/turmas")
+
+        assert resp.status_code == 401
+
 
 # ── POST /turmas/{id}/professores ─────────────────────────────────────────────
 

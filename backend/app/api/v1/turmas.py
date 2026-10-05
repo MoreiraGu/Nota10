@@ -102,6 +102,33 @@ def criar_turma(
     )
 
 @router.get(
+    "",
+    response_model=list[TurmaResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Lista todas as turmas",
+    description="Lista todas as turmas cadastradas. Restrito à Coordenação.",
+)
+def listar_turmas(
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[Usuario, _somente_coordenacao],
+) -> list[TurmaResponse]:
+    turmas = (
+        db.query(Turma)
+        .order_by(Turma.id.desc())
+        .all()
+    )
+
+    return [
+        TurmaResponse(
+            id=turma.id,
+            disciplina_id=turma.disciplina_id,
+            periodo_letivo=turma.periodo_letivo,
+            situacao=turma.situacao.value,
+        )
+        for turma in turmas
+    ]
+
+@router.get(
     "/minhas",
     response_model=list[MinhaTurmaResponse],
     status_code=status.HTTP_200_OK,
@@ -117,6 +144,8 @@ def listar_minhas_turmas_alias(
     current_user: Annotated[Usuario, _somente_professor],
 ) -> list[MinhaTurmaResponse]:
     return listar_turmas_do_professor(db, current_user.id)
+
+
 
 @router.get(
     "/{turma_id}",

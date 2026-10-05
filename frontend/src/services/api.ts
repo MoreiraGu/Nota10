@@ -346,6 +346,17 @@ export const api = {
 
   // ── Turmas (Coordenação) ────────────────────────────────────────────────
 
+  async getTurmas() {
+    return request<
+      Array<{
+        id: number;
+        disciplina_id: number;
+        periodo_letivo: string;
+        situacao: string;
+      }>
+    >('/turmas'); 
+  },
+
   async createTurma(data: { disciplina_id: number; periodo_letivo: string }) {
     return request<{
       id: number;
