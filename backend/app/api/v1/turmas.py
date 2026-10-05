@@ -39,7 +39,6 @@ from app.schemas.frequencia import (
     AlunoTurmaResponse,
     FrequenciaCreate,
     FrequenciaResponse,
-    MinhaTurmaResponse,
     TurmaAlunosResponse,
 )
 from app.schemas.nota import MediaResponse, NotaCreate, NotaMediaItem, NotaResponse
@@ -53,7 +52,9 @@ from app.schemas.turma import (
     TurmaResponse,
     TurmaProfessorResponse,
     VincularProfessorRequest,
+    MinhaTurmaResponse,
 )
+from app.services.turmas_professor import listar_turmas_do_professor
 from app.services.calculo_media import calculadora_padrao
 
 router = APIRouter(prefix="/turmas", tags=["Turmas"])
@@ -100,6 +101,22 @@ def criar_turma(
         situacao=turma.situacao.value,
     )
 
+@router.get(
+    "/minhas",
+    response_model=list[MinhaTurmaResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Lista as turmas do professor autenticado",
+    deprecated=True,
+    description=(
+        "Alias mantido por compatibilidade. "
+        "Prefira GET /professores/me/turmas."
+    ),
+)
+def listar_minhas_turmas_alias(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[Usuario, _somente_professor],
+) -> list[MinhaTurmaResponse]:
+    return listar_turmas_do_professor(db, current_user.id)
 
 @router.get(
     "/{turma_id}",
@@ -575,52 +592,3 @@ def listar_alunos_turma(
         nome=turma.disciplina.nome,
         alunos=alunos,
     )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ACAD-10 — Minhas turmas (professor logado)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get(
-    "/minhas",
-    response_model=list[MinhaTurmaResponse],
-    status_code=status.HTTP_200_OK,
-    summary="Lista as turmas do professor autenticado",
-)
-def listar_minhas_turmas(
-    db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[Usuario, _somente_professor],
-) -> list[MinhaTurmaResponse]:
-    professor = (
-        db.query(Professor)
-        .filter(Professor.usuario_id == current_user.id)
-        .first()
-    )
-    if not professor:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Professor não encontrado para o usuário autenticado",
-        )
-
-    vinculos = (
-        db.query(TurmaProfessor)
-        .filter(TurmaProfessor.professor_id == professor.id)
-        .all()
-    )
-
-    resultado = []
-    for v in vinculos:
-        total_alunos = (
-            db.query(func.count(Matricula.id))
-            .filter(Matricula.turma_id == v.turma_id)
-            .scalar()
-        )
-        resultado.append(
-            MinhaTurmaResponse(
-                turma_id=v.turma.id,
-                nome=v.turma.disciplina.nome,
-                total_alunos=total_alunos,
-            )
-        )
-
-    return resultado

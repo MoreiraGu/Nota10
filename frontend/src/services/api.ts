@@ -341,7 +341,7 @@ export const api = {
   },
 
   async getMinhasTurmas() {
-    return request<MinhaTurmaApi[]>('/turmas/minhas');
+    return request<MinhaTurmaApi[]>('/professores/me/turmas');
   },
 
   // ── Turmas (Coordenação) ────────────────────────────────────────────────

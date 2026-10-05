@@ -8,8 +8,8 @@ from app.api.deps import get_db, require_perfil
 from app.core.security import hash_senha
 from app.models.professor import Professor, SituacaoProfessor
 from app.models.usuario import Perfil, Usuario
-from app.models.turma import Turma
-from app.schemas.turma import TurmaProfessorResponse
+from app.schemas.turma import MinhaTurmaResponse
+from app.services.turmas_professor import listar_turmas_do_professor
 from app.schemas.professor import (
     ProfessorCreate,
     ProfessorListItem,
@@ -125,7 +125,7 @@ def listar_professores(
 
 @router.get(
     "/me/turmas",
-    response_model=list[TurmaProfessorResponse],
+    response_model=list[MinhaTurmaResponse],
     summary="Lista as turmas do professor logado",
     description=(
         "Retorna somente as turmas vinculadas ao professor autenticado. "
@@ -138,25 +138,8 @@ def listar_minhas_turmas(
         Usuario,
         Depends(require_perfil(Perfil.PROFESSOR)),
     ],
-) -> list[TurmaProfessorResponse]:
-    professor = (
-        db.query(Professor)
-        .filter(Professor.usuario_id == current_user.id)
-        .first()
-    )
-
-    if professor is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário não possui cadastro de professor",
-        )
-
-    return (
-        db.query(Turma)
-        .filter(Turma.professor_id == professor.id)
-        .order_by(Turma.id)
-        .all()
-    )
+) -> list[MinhaTurmaResponse]:
+    return listar_turmas_do_professor(db, current_user.id)
 
 
 # ── Obter ────────────────────────────────────────────────────────────────

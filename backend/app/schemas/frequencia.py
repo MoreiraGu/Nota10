@@ -28,8 +28,3 @@ class TurmaAlunosResponse(BaseModel):
     turma_id: int
     nome: str
     alunos: list[AlunoTurmaResponse]
-
-class MinhaTurmaResponse(BaseModel):
-    turma_id: int
-    nome: str
-    total_alunos: int
