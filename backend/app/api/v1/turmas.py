@@ -49,10 +49,10 @@ from app.schemas.turma import (
     ProfessorVinculoResponse,
     TurmaCreate,
     TurmaDetalheResponse,
+    TurmaListItem,
     TurmaResponse,
     TurmaProfessorResponse,
     VincularProfessorRequest,
-    MinhaTurmaResponse,
 )
 from app.services.turmas_professor import listar_turmas_do_professor
 from app.services.calculo_media import calculadora_padrao
@@ -103,7 +103,7 @@ def criar_turma(
 
 @router.get(
     "",
-    response_model=list[TurmaResponse],
+    response_model=list[TurmaListItem],
     status_code=status.HTTP_200_OK,
     summary="Lista todas as turmas",
     description="Lista todas as turmas cadastradas. Restrito à Coordenação.",
@@ -111,21 +111,46 @@ def criar_turma(
 def listar_turmas(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[Usuario, _somente_coordenacao],
-) -> list[TurmaResponse]:
-    turmas = (
-        db.query(Turma)
+) -> list[TurmaListItem]:
+
+    rows = (
+        db.query(
+            Turma.id.label("id"),
+            Turma.disciplina_id.label("disciplina_id"),
+            Disciplina.nome.label("disciplina"),
+            Turma.periodo_letivo.label("periodo_letivo"),
+            Turma.situacao.label("situacao"),
+            func.count(Matricula.id).label("total_alunos"),
+        )
+        .join(
+            Disciplina,
+            Disciplina.id == Turma.disciplina_id,
+        )
+        .outerjoin(
+            Matricula,
+            Matricula.turma_id == Turma.id,
+        )
+        .group_by(
+            Turma.id,
+            Turma.disciplina_id,
+            Disciplina.nome,
+            Turma.periodo_letivo,
+            Turma.situacao,
+        )
         .order_by(Turma.id.desc())
         .all()
     )
 
     return [
-        TurmaResponse(
-            id=turma.id,
-            disciplina_id=turma.disciplina_id,
-            periodo_letivo=turma.periodo_letivo,
-            situacao=turma.situacao.value,
+        TurmaListItem(
+            id=row.id,
+            disciplina_id=row.disciplina_id,
+            disciplina=row.disciplina,
+            periodo_letivo=row.periodo_letivo,
+            situacao=row.situacao.value,
+            total_alunos=row.total_alunos,
         )
-        for turma in turmas
+        for row in rows
     ]
 
 @router.get(

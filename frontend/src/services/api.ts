@@ -95,6 +95,15 @@ export interface MinhaTurmaApi {
   total_alunos: number;
 }
 
+export interface TurmaListApi {
+  id: number;
+  disciplina_id: number;
+  disciplina: string;
+  periodo_letivo: string;
+  situacao: string;
+  total_alunos: number;
+}
+
 export const api = {
   // ── Autenticação ───────────────────────────────────────────────────────
   async login(email: string, senha: string) {
@@ -347,14 +356,7 @@ export const api = {
   // ── Turmas (Coordenação) ────────────────────────────────────────────────
 
   async getTurmas() {
-    return request<
-      Array<{
-        id: number;
-        disciplina_id: number;
-        periodo_letivo: string;
-        situacao: string;
-      }>
-    >('/turmas'); 
+    return request<TurmaListApi[]>('/turmas');
   },
 
   async createTurma(data: { disciplina_id: number; periodo_letivo: string }) {
