@@ -18,6 +18,19 @@ class TurmaResponse(BaseModel):
     periodo_letivo: str
     situacao: str
 
+class MinhaTurmaResponse(BaseModel):
+    turma_id: int
+    nome: str
+    total_alunos: int
+
+class TurmaListItem(BaseModel):
+    id: int
+    disciplina_id: int
+    disciplina: str
+    periodo_letivo: str
+    situacao: str
+    total_alunos: int
+
 
 class ProfessorVinculoResponse(BaseModel):
     id: int

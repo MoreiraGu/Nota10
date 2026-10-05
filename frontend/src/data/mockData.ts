@@ -91,20 +91,34 @@ export const mockFrequencia: Frequencia[] = [
 
 export const mockBoletim: ItemBoletim[] = [
   {
+    turmaId: 't1',
     disciplina: 'Programação Web',
-    notas: [{ tipo: 'Prova 1', valor: 8.5 }, { tipo: 'Prova 2', valor: null }, { tipo: 'Trabalho', valor: 7.0 }],
+    notas: [
+      { tipo: 'Prova 1', valor: 8.5 },
+      { tipo: 'Prova 2', valor: null },
+      { tipo: 'Trabalho', valor: 7.0 },
+    ],
     media: 7.8,
     frequencia: 90,
   },
   {
+    turmaId: 't3',
     disciplina: 'Banco de Dados',
-    notas: [{ tipo: 'Prova 1', valor: 7.0 }, { tipo: 'Prova 2', valor: 8.0 }, { tipo: 'Trabalho', valor: 9.0 }],
+    notas: [
+      { tipo: 'Prova 1', valor: 7.0 },
+      { tipo: 'Prova 2', valor: 8.0 },
+      { tipo: 'Trabalho', valor: 9.0 },
+    ],
     media: 8.0,
     frequencia: 85,
   },
   {
+    turmaId: 't2',
     disciplina: 'Engenharia de Software',
-    notas: [{ tipo: 'Prova 1', valor: null }, { tipo: 'Trabalho', valor: null }],
+    notas: [
+      { tipo: 'Prova 1', valor: null },
+      { tipo: 'Trabalho', valor: null },
+    ],
     media: null,
     frequencia: null,
   },
