@@ -26,17 +26,20 @@ export function TurmasList() {
     async function carregar() {
       try {
         setLoading(true);
-        const [disciplinasData] = await Promise.all([
-          api.getDisciplinas(),
-        ]);
-        // Monta mapa id→nome de disciplinas
-        const mapa: Record<number, string> = {};
-        disciplinasData.forEach(d => { mapa[d.id] = d.nome; });
-        setDisciplinasMap(mapa);
+        
+        const [disciplinasData, turmasData] = await Promise.all([
+        api.getDisciplinas(),
+        api.getTurmas(),
+      ]);
 
-        // Não há GET /turmas público ainda — Coordenação vê via lista de disciplinas por enquanto
-        // Esse endpoint será adicionado quando houver necessidade de listagem global
-        setTurmas([]);
+      const mapa: Record<number, string> = {};
+
+      disciplinasData.forEach(d => {
+        mapa[d.id] = d.nome;
+      });
+
+      setDisciplinasMap(mapa);
+      setTurmas(turmasData);
       } catch (e) {
         if (e instanceof ApiError) toast(e.message, 'error');
         else toast('Não foi possível carregar as turmas.', 'error');

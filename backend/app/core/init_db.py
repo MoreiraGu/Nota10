@@ -1,90 +1,229 @@
 """Script de inicialização e população do banco de dados (Docker/Dev)."""
 
+import app.models  # noqa: F401 - registra todos os models no metadata
+
 from app.core.database import Base, SessionLocal, engine
 from app.core.security import hash_senha
 from app.models.curso import Curso
 from app.models.estudante import Estudante, SituacaoEstudante
+from app.models.professor import Professor, SituacaoProfessor
 from app.models.usuario import Perfil, Usuario
+
+
+SENHA_PADRAO = "123456"
+
+
+def obter_ou_criar_usuario(
+    db,
+    *,
+    nome: str,
+    email: str,
+    perfil: Perfil,
+) -> Usuario:
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.email == email)
+        .first()
+    )
+
+    if usuario is None:
+        usuario = Usuario(
+            nome=nome,
+            email=email,
+            senha_hash=hash_senha(SENHA_PADRAO),
+            perfil=perfil,
+            ativo=True,
+        )
+        db.add(usuario)
+        db.flush()
+
+        print(f"Usuário criado: {email}")
+    else:
+        # Mantém o ambiente de desenvolvimento previsível.
+        usuario.nome = nome
+        usuario.perfil = perfil
+        usuario.ativo = True
+
+    return usuario
 
 
 def init_db():
     print("Criando tabelas no banco de dados...")
+
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
+
     try:
-        # 1. Cria Cursos
+        # ============================================================
+        # 1. CURSOS
+        # ============================================================
+
         cursos_data = [
             "Sistemas de Informação",
             "Engenharia de Software",
             "Ciência de Dados",
         ]
-        cursos_map = {}
-        for nome_c in cursos_data:
-            c = db.query(Curso).filter(Curso.nome == nome_c).first()
-            if not c:
-                c = Curso(nome=nome_c)
-                db.add(c)
+
+        cursos_map: dict[str, Curso] = {}
+
+        for nome_curso in cursos_data:
+            curso = (
+                db.query(Curso)
+                .filter(Curso.nome == nome_curso)
+                .first()
+            )
+
+            if curso is None:
+                curso = Curso(nome=nome_curso)
+                db.add(curso)
                 db.flush()
-                print(f"Curso criado: {c.nome} (id={c.id})")
-            cursos_map[nome_c] = c
 
-        # 2. Cria Usuário Coordenação
-        coord = db.query(Usuario).filter(Usuario.email == "coordenacao@sgca.edu.br").first()
-        if not coord:
-            coord = Usuario(
-                nome="Coordenador Geral",
-                email="coordenacao@sgca.edu.br",
-                senha_hash=hash_senha("admin123"),
-                perfil=Perfil.COORDENACAO,
-                ativo=True,
+                print(
+                    f"Curso criado: {curso.nome} "
+                    f"(id={curso.id})"
+                )
+
+            cursos_map[nome_curso] = curso
+
+        # ============================================================
+        # 2. COORDENAÇÃO
+        # ============================================================
+
+        obter_ou_criar_usuario(
+            db,
+            nome="Coordenador Geral",
+            email="coordenacao@sgca.edu.br",
+            perfil=Perfil.COORDENACAO,
+        )
+
+        # ============================================================
+        # 3. PROFESSOR
+        # ============================================================
+
+        usuario_professor = obter_ou_criar_usuario(
+            db,
+            nome="Prof. Ana Martins",
+            email="ana.martins@sgca.edu.br",
+            perfil=Perfil.PROFESSOR,
+        )
+
+        professor = (
+            db.query(Professor)
+            .filter(
+                Professor.usuario_id == usuario_professor.id
             )
-            db.add(coord)
-            print("Usuário de Coordenação criado: coordenacao@sgca.edu.br / admin123")
+            .first()
+        )
 
-        # 3. Cria Usuário Professor
-        prof = db.query(Usuario).filter(Usuario.email == "ana.martins@sgca.edu.br").first()
-        if not prof:
-            prof = Usuario(
-                nome="Prof. Ana Martins",
-                email="ana.martins@sgca.edu.br",
-                senha_hash=hash_senha("prof123"),
-                perfil=Perfil.PROFESSOR,
-                ativo=True,
+        if professor is None:
+            professor = Professor(
+                usuario_id=usuario_professor.id,
+                contato="(11) 98888-1111",
+                situacao=SituacaoProfessor.ATIVO,
             )
-            db.add(prof)
-            print("Usuário Professor criado: ana.martins@sgca.edu.br / prof123")
 
-        # 4. Cria Estudantes iniciais reais
+            db.add(professor)
+            db.flush()
+
+            print(
+                "Professor criado: "
+                "Prof. Ana Martins "
+                f"(id={professor.id})"
+            )
+        else:
+            professor.situacao = SituacaoProfessor.ATIVO
+
+        # ============================================================
+        # 4. ESTUDANTES
+        # ============================================================
+
         estudantes_iniciais = [
-            ("Rafael Almeida", "rafael.almeida@sgca.edu.br", "Sistemas de Informação"),
-            ("Mariana Souza", "mariana.souza@sgca.edu.br", "Engenharia de Software"),
-            ("Lucas Oliveira", "lucas.oliveira@sgca.edu.br", "Ciência de Dados"),
+            (
+                "Rafael Almeida",
+                "rafael.almeida@sgca.edu.br",
+                "Sistemas de Informação",
+                "(11) 97777-1001",
+            ),
+            (
+                "Mariana Souza",
+                "mariana.souza@sgca.edu.br",
+                "Engenharia de Software",
+                "(11) 97777-1002",
+            ),
+            (
+                "Lucas Oliveira",
+                "lucas.oliveira@sgca.edu.br",
+                "Ciência de Dados",
+                "(11) 97777-1003",
+            ),
         ]
 
-        for nome_e, email_e, curso_nome in estudantes_iniciais:
-            u = db.query(Usuario).filter(Usuario.email == email_e).first()
-            if not u:
-                u = Usuario(
-                    nome=nome_e,
-                    email=email_e,
-                    senha_hash=hash_senha("aluno123"),
-                    perfil=Perfil.ALUNO,
-                    ativo=True,
-                )
-                db.add(u)
-                db.flush()
+        for (
+            nome_estudante,
+            email_estudante,
+            curso_nome,
+            contato,
+        ) in estudantes_iniciais:
 
-                est = Estudante(
-                    usuario_id=u.id,
+            usuario = obter_ou_criar_usuario(
+                db,
+                nome=nome_estudante,
+                email=email_estudante,
+                perfil=Perfil.ALUNO,
+            )
+
+            estudante = (
+                db.query(Estudante)
+                .filter(
+                    Estudante.usuario_id == usuario.id
+                )
+                .first()
+            )
+
+            if estudante is None:
+                estudante = Estudante(
+                    usuario_id=usuario.id,
                     curso_id=cursos_map[curso_nome].id,
+                    contato=contato,
                     situacao=SituacaoEstudante.ATIVO,
                 )
-                db.add(est)
-                print(f"Estudante criado: {nome_e} ({email_e})")
+
+                db.add(estudante)
+                db.flush()
+
+                print(
+                    f"Estudante criado: "
+                    f"{nome_estudante} "
+                    f"({email_estudante})"
+                )
+            else:
+                estudante.curso_id = cursos_map[curso_nome].id
+                estudante.situacao = SituacaoEstudante.ATIVO
 
         db.commit()
+
+        print()
         print("Banco de dados inicializado com sucesso!")
+        print()
+        print("Credenciais de desenvolvimento:")
+        print(
+            "Coordenação: "
+            "coordenacao@sgca.edu.br / 123456"
+        )
+        print(
+            "Professor:   "
+            "ana.martins@sgca.edu.br / 123456"
+        )
+        print(
+            "Aluno:       "
+            "rafael.almeida@sgca.edu.br / 123456"
+        )
+
+    except Exception:
+        db.rollback()
+        raise
+
     finally:
         db.close()
 
