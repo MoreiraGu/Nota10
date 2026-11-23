@@ -669,3 +669,83 @@ class TestIsolamentoBoletim:
         )
 
         assert response.status_code == 405
+
+
+
+# ── Situação acadêmica no boletim ─────────────────────────────────────────
+
+
+class TestSituacaoAcademicaBoletim:
+
+    def test_aprovado_com_todas_notas_e_frequencia_suficiente(self, client, db):
+        curso = _criar_curso(db)
+        usuario, estudante = _criar_aluno(db, "Ana", "ana@test.com", curso)
+        turma = _criar_turma(db, curso, "Engenharia de Software")
+        matricula = _matricular(db, estudante, turma)
+
+        _adicionar_nota(db, matricula, "P1", 8.0)
+        _adicionar_nota(db, matricula, "P2", 7.0)
+        _adicionar_frequencia(db, matricula, total_aulas=20, total_presencas=18)
+
+        response = client.get("/api/v1/alunos/me/boletim", headers=_headers(usuario))
+        assert response.status_code == 200
+        item = response.json()[0]
+
+        assert item["media"] == 7.5
+        assert item["frequencia"] == 90.0
+        assert item["faltas"] == 2
+        assert item["situacao"] == "APROVADO"
+        assert item["situacao_label"] == "Aprovado"
+
+    def test_em_recuperacao_quando_media_entre_4_e_6(self, client, db):
+        curso = _criar_curso(db)
+        usuario, estudante = _criar_aluno(db, "Bruno", "bruno@test.com", curso)
+        turma = _criar_turma(db, curso, "Estrutura de Dados")
+        matricula = _matricular(db, estudante, turma)
+
+        _adicionar_nota(db, matricula, "P1", 5.0)
+        _adicionar_nota(db, matricula, "P2", 5.5)
+        _adicionar_frequencia(db, matricula, total_aulas=20, total_presencas=16)
+
+        response = client.get("/api/v1/alunos/me/boletim", headers=_headers(usuario))
+        assert response.status_code == 200
+        item = response.json()[0]
+
+        assert item["media"] == 5.25
+        assert item["situacao"] == "RECUPERACAO"
+        assert item["situacao_label"] == "Em recuperação"
+
+    def test_reprovado_por_frequencia_mesmo_com_media_alta(self, client, db):
+        curso = _criar_curso(db)
+        usuario, estudante = _criar_aluno(db, "Carla", "carla@test.com", curso)
+        turma = _criar_turma(db, curso, "Redes")
+        matricula = _matricular(db, estudante, turma)
+
+        _adicionar_nota(db, matricula, "P1", 9.5)
+        _adicionar_frequencia(db, matricula, total_aulas=20, total_presencas=10)
+
+        response = client.get("/api/v1/alunos/me/boletim", headers=_headers(usuario))
+        assert response.status_code == 200
+        item = response.json()[0]
+
+        assert item["media"] == 9.5
+        assert item["frequencia"] == 50.0
+        assert item["situacao"] == "REPROVADO"
+        assert item["situacao_label"] == "Reprovado por falta"
+
+    def test_em_andamento_quando_sem_notas_ou_sem_frequencia(self, client, db):
+        curso = _criar_curso(db)
+        usuario, estudante = _criar_aluno(db, "Diego", "diego@test.com", curso)
+        turma_sem_nota = _criar_turma(db, curso, "Sistemas Operacionais")
+        turma_sem_freq = _criar_turma(db, curso, "IHC")
+
+        _matricular(db, estudante, turma_sem_nota)
+        mat_sem_freq = _matricular(db, estudante, turma_sem_freq)
+        _adicionar_nota(db, mat_sem_freq, "P1", 8.5)
+
+        response = client.get("/api/v1/alunos/me/boletim", headers=_headers(usuario))
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data[0]["situacao"] == "EM_ANDAMENTO"
+        assert data[1]["situacao"] == "EM_ANDAMENTO"

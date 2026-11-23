@@ -11,6 +11,7 @@ from app.models.nota import Nota
 from app.models.usuario import Perfil, Usuario
 from app.schemas.boletim import ItemBoletimResponse, NotaBoletimResponse
 from app.services.calculo_media import calculadora_padrao
+from app.services.situacao_academica import avaliar_situacao_disciplina
 
 
 router = APIRouter(
@@ -26,8 +27,8 @@ _somente_aluno = Depends(require_perfil(Perfil.ALUNO))
     response_model=list[ItemBoletimResponse],
     summary="Consulta o boletim do aluno autenticado",
     description=(
-        "Retorna notas, média e frequência das turmas em que "
-        "o aluno autenticado está matriculado. Média calculada pelo backend (Template Method)."
+        "Retorna notas, média, frequência e situação acadêmica das turmas em que "
+        "o aluno autenticado está matriculado. Cálculos realizados pelo backend."
     ),
 )
 def obter_meu_boletim(
@@ -74,6 +75,8 @@ def obter_meu_boletim(
             for nota in notas_db
         ]
 
+        possui_avaliacao_pendente = any(nota.valor is None for nota in notas_db)
+
         # Média calculada pelo backend via Template Method
         media = calculadora_padrao.calcular(notas_db)
 
@@ -87,20 +90,36 @@ def obter_meu_boletim(
         )
 
         if frequencia_db and frequencia_db.total_aulas > 0:
-            frequencia = round(
-                (frequencia_db.presencas / frequencia_db.total_aulas) * 100,
-                1,
-            )
+            total_aulas = frequencia_db.total_aulas
+            presencas = frequencia_db.presencas
+            faltas = total_aulas - presencas
+            frequencia = round((presencas / total_aulas) * 100, 1)
         else:
+            total_aulas = None
+            presencas = None
+            faltas = None
             frequencia = None
+
+        resultado_situacao = avaliar_situacao_disciplina(
+            media=media,
+            frequencia=frequencia,
+            possui_avaliacao_pendente=possui_avaliacao_pendente,
+        )
 
         boletim.append(
             ItemBoletimResponse(
                 turma_id=matricula.turma_id,
                 disciplina=matricula.turma.disciplina.nome,
+                periodo_letivo=getattr(matricula.turma, "periodo_letivo", None),
                 notas=notas,
                 media=media,
                 frequencia=frequencia,
+                total_aulas=total_aulas,
+                presencas=presencas,
+                faltas=faltas,
+                situacao=resultado_situacao.codigo,
+                situacao_label=resultado_situacao.label,
+                situacao_detalhe=resultado_situacao.detalhe,
             )
         )
 
