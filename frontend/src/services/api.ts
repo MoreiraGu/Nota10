@@ -435,21 +435,35 @@ export const api = {
       Array<{
         turma_id: number;
         disciplina: string;
+        periodo_letivo: string | null;
         notas: Array<{
           tipo: string;
           valor: number | null;
         }>;
         media: number | null;
         frequencia: number | null;
+        total_aulas: number | null;
+        presencas: number | null;
+        faltas: number | null;
+        situacao: 'APROVADO' | 'RECUPERACAO' | 'REPROVADO' | 'EM_ANDAMENTO';
+        situacao_label: string;
+        situacao_detalhe: string;
       }>
     >('/alunos/me/boletim');
 
     return data.map(item => ({
       turmaId: String(item.turma_id),
       disciplina: item.disciplina,
+      periodoLetivo: item.periodo_letivo,
       notas: item.notas,
       media: item.media,
       frequencia: item.frequencia,
+      totalAulas: item.total_aulas,
+      presencas: item.presencas,
+      faltas: item.faltas,
+      situacao: item.situacao,
+      situacaoLabel: item.situacao_label,
+      situacaoDetalhe: item.situacao_detalhe,
     }));
-  },
-};
+  }
+}

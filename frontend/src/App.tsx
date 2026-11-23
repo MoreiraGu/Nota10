@@ -90,7 +90,7 @@ function AppRoutes() {
 
       {/* Aluno */}
       <Route path="/boletim" element={<ProtectedRoute roles={['aluno']}><MeuBoletim /></ProtectedRoute>} />
-      <Route path="/minhas-turmas-aluno" element={<ProtectedRoute roles={['aluno']}><div className="text-sm text-[#5B5645] py-8">Em breve.</div></ProtectedRoute>} />
+      
       <Route path="/historico" element={<ProtectedRoute roles={['aluno']}><div className="text-sm text-[#5B5645] py-8">Em breve.</div></ProtectedRoute>} />
       <Route path="/meus-dados" element={<ProtectedRoute roles={['aluno']}><div className="text-sm text-[#5B5645] py-8">Em breve.</div></ProtectedRoute>} />
 
