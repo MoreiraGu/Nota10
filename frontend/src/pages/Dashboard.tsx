@@ -1,5 +1,4 @@
 import { useAuth } from '../contexts/AuthContext';
-import { mockEstudantes, mockProfessores, mockTurmas, mockDisciplinas } from '../data/mockData';
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type {
