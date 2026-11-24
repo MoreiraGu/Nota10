@@ -1,45 +1,28 @@
-import { useEffect, useState } from 'react';
-import type { Curso } from '../types';
+import { useState } from 'react';
 import { api } from '../services/api';
+import { useApi } from '../hooks/useApi';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Ficha, FichaWatermarks } from '../components/ui/Ficha';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
+import { Carregando, Erro, Vazio } from '../components/ui/Estado';
 
 export function Cursos() {
   const { toast } = useToast();
-  const [cursos, setCursos] = useState<Curso[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [createModal, setCreateModal] = useState(false);
+  const { data: cursos, loading, error, recarregar } = useApi(() => api.getCursos());
+
+  const [modalAberto, setModalAberto] = useState(false);
   const [nome, setNome] = useState('');
   const [nomeError, setNomeError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const carregarCursos = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const cursosData = await api.getCursos();
-      setCursos(
-        cursosData.map(curso => ({
-          id: String(curso.id),
-          nome: curso.nome,
-          totalDisciplinas: 0,
-        }))
-      );
-    } catch (err: any) {
-      setError(err?.message || 'Não foi possível carregar os cursos.');
-    } finally {
-      setLoading(false);
-    }
+  const fecharModal = () => {
+    setModalAberto(false);
+    setNome('');
+    setNomeError('');
   };
-
-  useEffect(() => {
-    carregarCursos();
-  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,16 +33,10 @@ export function Cursos() {
 
     setSaving(true);
     try {
-      const criado = await api.createCurso({ nome: nome.trim() });
-      setCursos(prev => [...prev, {
-        id: String(criado.id),
-        nome: criado.nome,
-        totalDisciplinas: 0,
-      }].sort((a, b) => a.nome.localeCompare(b.nome)));
-      setCreateModal(false);
-      setNome('');
-      setNomeError('');
+      await api.createCurso({ nome: nome.trim() });
       toast('Curso criado com sucesso.');
+      fecharModal();
+      recarregar();
     } catch (err: any) {
       toast(err?.message || 'Erro ao criar curso.', 'error');
     } finally {
@@ -67,45 +44,27 @@ export function Cursos() {
     }
   };
 
-  const closeModal = () => {
-    setCreateModal(false);
-    setNome('');
-    setNomeError('');
-  };
-
   return (
     <div>
       <PageHeader
         title="Cursos"
         description="Gerencie os cursos disponíveis na instituição."
-        action={<Button onClick={() => setCreateModal(true)}>+ Novo curso</Button>}
+        action={<Button onClick={() => setModalAberto(true)}>+ Novo curso</Button>}
       />
 
-      {error && (
-        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-center justify-between gap-4">
-          <span>{error}</span>
-          <button onClick={carregarCursos} className="font-semibold underline cursor-pointer shrink-0">
-            Tentar novamente
-          </button>
-        </div>
-      )}
+      {error && <Erro texto={error} onTentarNovamente={recarregar} />}
 
       {loading ? (
-        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C]">
-          <p className="text-sm font-semibold">Carregando cursos...</p>
-        </div>
-      ) : cursos.length === 0 ? (
-        <div className="card-surface-plain flex flex-col items-center justify-center py-16 text-[#948F7C] gap-3">
-          <p className="text-sm">Nenhum curso cadastrado.</p>
-          {!error && <Button size="sm" onClick={() => setCreateModal(true)}>Cadastrar o primeiro curso</Button>}
-        </div>
+        <Carregando texto="Carregando cursos..." />
+      ) : !cursos || cursos.length === 0 ? (
+        <Vazio texto="Nenhum curso cadastrado." />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {cursos.map(c => (
+          {cursos.map(curso => (
             <Ficha
-              key={c.id}
+              key={curso.id}
               eyebrow="Curso"
-              title={c.nome}
+              title={curso.nome}
               watermark={FichaWatermarks.livro}
               stats={[]}
             />
@@ -113,7 +72,7 @@ export function Cursos() {
         </div>
       )}
 
-      <Modal open={createModal} onClose={closeModal} title="Novo curso">
+      <Modal open={modalAberto} onClose={fecharModal} title="Novo curso">
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label="Nome do curso"
@@ -124,7 +83,7 @@ export function Cursos() {
             placeholder="Ex: Sistemas de Informação"
           />
           <div className="flex gap-2 justify-end pt-2">
-            <Button type="button" variant="secondary" onClick={closeModal}>Cancelar</Button>
+            <Button type="button" variant="secondary" onClick={fecharModal}>Cancelar</Button>
             <Button type="submit" loading={saving}>Criar curso</Button>
           </div>
         </form>
