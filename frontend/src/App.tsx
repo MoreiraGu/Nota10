@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import { AppShell } from './components/layout/AppShell';
 import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
+import { Dashboard } from './pages/dashboard/Dashboard';
 import { EstudantesList } from './pages/estudantes/EstudantesList';
 import { EstudantesForm } from './pages/estudantes/EstudantesForm';
 import { ProfessoresList } from './pages/professores/ProfessoresList';
