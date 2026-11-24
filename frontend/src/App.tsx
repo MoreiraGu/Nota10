@@ -18,6 +18,7 @@ import { MinhasTurmaDetalhe } from './pages/professor/MinhasTurmaDetalhe';
 import { LancarNotas } from './pages/professor/LancarNotas';
 import { LancarFrequencia } from './pages/professor/LancarFrequencia';
 import { MeuBoletim } from './pages/aluno/MeuBoletim';
+import { MeusDados } from './pages/aluno/MeusDados';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: string[] }) {
@@ -91,7 +92,7 @@ function AppRoutes() {
       {/* Aluno */}
       <Route path="/boletim" element={<ProtectedRoute roles={['aluno']}><MeuBoletim /></ProtectedRoute>} />
       <Route path="/historico" element={<ProtectedRoute roles={['aluno']}><div className="text-sm text-[#5B5645] py-8">Em breve.</div></ProtectedRoute>} />
-      <Route path="/meus-dados" element={<ProtectedRoute roles={['aluno']}><div className="text-sm text-[#5B5645] py-8">Em breve.</div></ProtectedRoute>} />
+      <Route path="/meus-dados" element={<ProtectedRoute roles={['aluno']}><MeusDados /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

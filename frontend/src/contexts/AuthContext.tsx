@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const restored: AuthUser = {
           id: String(me.usuario_id),
           nome: me.nome,
-          email: '',
+          email: user?.email ?? '',
           perfil: role,
         };
         setUser(restored);
