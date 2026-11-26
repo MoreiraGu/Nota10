@@ -1,5 +1,11 @@
 export type UserRole = 'coordenacao' | 'professor' | 'aluno';
 
+export type SituacaoAcademica =
+  | 'APROVADO'
+  | 'RECUPERACAO'
+  | 'REPROVADO'
+  | 'EM_ANDAMENTO';
+
 export interface User {
   id: string;
   nome: string;
@@ -90,10 +96,17 @@ export interface Frequencia {
 export interface ItemBoletim {
   turmaId: string;
   disciplina: string;
+  periodoLetivo: string | null;
   notas: {
     tipo: string;
     valor: number | null;
   }[];
   media: number | null;
   frequencia: number | null;
+  totalAulas: number | null;
+  presencas: number | null;
+  faltas: number | null;
+  situacao: SituacaoAcademica;
+  situacaoLabel: string;
+  situacaoDetalhe: string;
 }

@@ -1,120 +1,168 @@
-# ⚙️ Backend - Nota 10 (FastAPI)
+# Backend — Nota10
 
-Este documento detalha a arquitetura do backend, explicando a finalidade de cada diretório e arquivo, além dos comandos de instalação e execução.
+API REST em **FastAPI** com **SQLAlchemy** e autenticação **JWT**. É aqui que ficam todas as regras de negócio: cálculo da média, frequência, situação acadêmica e permissões.
 
 ---
 
-## 📂 Guia Detalhado da Estrutura de Pastas
+## Como rodar
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+python -m app.core.init_db
+uvicorn app.main:app --reload --port 8000
+```
+
+- `python -m app.core.init_db` cria as tabelas e os usuários de teste (senha `123456`): `coordenacao@sgca.edu.br`, `ana.martins@sgca.edu.br` (professor) e `rafael.almeida@sgca.edu.br` (aluno).
+- O `.env.example` aponta para o PostgreSQL do `docker-compose.yml`. Para usar SQLite, troque o `DATABASE_URL` por `sqlite:///./nota10.db`.
+- Swagger com todos os endpoints: http://localhost:8000/docs
+- Se o PowerShell bloquear a ativação do venv: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+
+### Testes
+
+```powershell
+pytest -v
+```
+
+Os testes usam um banco SQLite próprio e não precisam do servidor rodando.
+
+---
+
+## Estrutura de pastas
 
 ```text
 backend/
 ├── app/
-│   ├── api/
-│   │   ├── deps.py             # Injeção de dependências (get_db, RBAC por perfil e por recurso)
-│   │   └── v1/                 # Endpoints versionados da API (/api/v1)
+│   ├── main.py               Cria o FastAPI, configura CORS e os handlers de erro
 │   ├── core/
-│   │   ├── config.py           # Leitura e tipagem das variáveis de ambiente (.env)
-│   │   ├── database.py         # Configuração da engine e sessão do SQLAlchemy
-│   │   └── security.py         # Criptografia de senhas (bcrypt) e geração/validação de JWT
-│   ├── models/                 # Mapeamento Objeto-Relacional (ORM SQLAlchemy)
-│   ├── schemas/                # Schemas Pydantic (Request DTOs e Response DTOs)
-│   ├── services/               # Regras de negócio e padrões (Template Method para médias)
-│   └── main.py                 # Ponto de entrada da aplicação FastAPI, CORS e handlers
-├── tests/                      # Suíte de testes automatizados com pytest
-├── requirements.txt            # Lista de dependências Python
-├── .env.example                # Template de variáveis de ambiente
-└── README.md                   # Este arquivo
+│   │   ├── config.py         Lê as variáveis do .env
+│   │   ├── database.py       Conexão com o banco e get_db
+│   │   ├── security.py       Hash de senha (bcrypt) e token JWT
+│   │   └── init_db.py        Cria tabelas e dados de teste
+│   ├── models/               Tabelas (SQLAlchemy)
+│   ├── schemas/              Formato de entrada e saída da API (Pydantic)
+│   ├── services/             Regras de negócio
+│   │   ├── calculo_media.py        Template Method da média
+│   │   ├── situacao_academica.py   Aprovado / recuperação / reprovado
+│   │   └── turmas_professor.py     Turmas do professor logado
+│   └── api/
+│       ├── deps.py           Usuário logado e permissões
+│       └── v1/               Rotas, um arquivo por recurso
+├── tests/                    Testes com pytest
+├── requirements.txt
+└── .env.example
 ```
 
----
+### Tabelas (`app/models/`)
 
-## 🔍 Para Que Serve Cada Coisa no Backend?
-
-### 1. `app/core/` (Configurações Centrais e Infraestrutura)
-- **`config.py`**: Carrega as configurações do arquivo `.env` usando `pydantic-settings`. Centraliza variáveis como nome do projeto, secret key do JWT, tempo de expiração do token e string de conexão do banco de dados (`DATABASE_URL`).
-- **`database.py`**: Cria a engine do SQLAlchemy (suporta tanto SQLite local quanto PostgreSQL sem mudar código) e disponibiliza a função geradora `get_db` para injeção de dependência nas rotas.
-- **`security.py`**: Funções utilitárias de segurança para criar hashes seguros de senhas (`bcrypt`), verificar senhas no login e assinar/validar tokens JWT.
-
----
-
-### 2. `app/models/` (Camada de Dados / Tabelas)
-Nesta pasta ficam as classes que herdam de `Base = declarative_base()`, representando as tabelas no banco de dados conforme a seção 19 da especificação:
-- `usuario.py`: Tabela `usuarios` (login, senha hash, perfil `COORDENACAO`, `PROFESSOR`, `ALUNO`, status ativo/inativo).
-- `estudante.py`: Tabela `estudantes` (dados específicos do aluno, curso vinculado).
-- `professor.py`: Tabela `professores` (dados do docente).
-- `curso.py`: Tabela `cursos` (cursos oferecidos).
-- `disciplina.py`: Tabela `disciplinas` (vinculadas aos cursos).
-- `turma.py`: Tabela `turmas` e a tabela associativa `turma_professores` (essencial para validar quais professores lecionam em quais turmas).
-- `matricula.py`: Tabela `matriculas` (associação aluno e turma).
-- `nota.py`: Tabela `notas` (registro da avaliação, peso, nota e professor lançador).
-- `frequencia.py`: Tabela `frequencia` (total de aulas, presenças e professor lançador).
+| Tabela | O que guarda |
+|---|---|
+| `usuarios` | Login, senha (hash), perfil (`COORDENACAO`, `PROFESSOR`, `ALUNO`) e se está ativo |
+| `estudantes` | Dados do aluno e o curso dele |
+| `professores` | Dados do professor |
+| `cursos` | Cursos |
+| `disciplinas` | Disciplinas, cada uma ligada a um curso |
+| `turmas` | Uma disciplina oferecida num período letivo (ex.: `2026.2`) |
+| `turma_professores` | Quais professores lecionam em cada turma |
+| `matriculas` | Quais alunos estão em cada turma |
+| `notas` | Avaliações: tipo, peso, valor e quem lançou |
+| `frequencia` | Total de aulas e presenças de cada aluno na turma |
 
 ---
 
-### 3. `app/schemas/` (Contratos de Dados / Pydantic)
-Separa o modelo do banco das informações que transitam na rede:
-- **Request Schemas**: Validam os dados enviados pelo cliente no corpo da requisição (ex.: formato do e-mail, notas entre 0 e 10, total de faltas não maior que total de aulas).
-- **Response Schemas**: Definem exatamente o que a API retorna, evitando expor dados sensíveis (como hashes de senhas).
+## Regras de negócio
+
+### Cálculo da média: Template Method (`services/calculo_media.py`)
+
+A classe base `CalculadoraMedia` define o passo a passo fixo no método `calcular()`:
+
+1. **Filtra** as notas que já têm valor (etapa fixa).
+2. **Aplica o critério** de cálculo (etapa variável, cada subclasse faz a sua).
+3. **Devolve** o resultado, ou `None` se ainda não há nota (etapa fixa).
+
+| Subclasse | Critério |
+|---|---|
+| `MediaPonderada` (padrão do sistema) | `soma(nota × peso) / soma(pesos)` |
+| `MediaSimples` | `soma(notas) / quantidade` |
+
+Para mudar a forma de calcular, basta criar outra subclasse e sobrescrever só `_aplicar_criterio()`, sem mexer no fluxo.
+
+### Situação acadêmica (`services/situacao_academica.py`)
+
+A função `avaliar_situacao_disciplina` decide a situação de cada disciplina no boletim, nesta ordem:
+
+| Condição | Situação |
+|---|---|
+| Nenhuma nota lançada | Em andamento |
+| Frequência abaixo de 75% | Reprovado por falta |
+| Alguma avaliação ainda sem nota | Em andamento |
+| Frequência ainda não lançada | Em andamento |
+| Média ≥ 6,0 | Aprovado |
+| Média ≥ 4,0 | Em recuperação |
+| Média abaixo de 4,0 | Reprovado por média |
+
+Os limites ficam nas constantes `MEDIA_MINIMA_APROVACAO`, `MEDIA_MINIMA_RECUPERACAO` e `FREQUENCIA_MINIMA_PERCENTUAL`.
+
+### Frequência
+
+Percentual = `presencas / total_aulas × 100`, com uma casa decimal. Presenças não podem passar do total de aulas.
 
 ---
 
-### 4. `app/services/` (Regras de Negócio e Padrões de Projeto)
-Isola regras de negócio complexas para não poluir os controladores de rota:
-- **`calculadora_media.py`**: Implementação obrigatória do padrão **Template Method** (`EP.6`).
-  - *Classe Base*: Define a sequência padrão (1. Coleta as notas -> 2. Aplica critério de ponderação -> 3. Define situação Aprovado/Reprovado).
-  - *Subclasses*: Implementam o passo 2 de forma variável (ex.: `MediaSimples` vs `MediaPonderada`).
+## Autenticação e permissões (`api/deps.py`)
+
+1. O login (`POST /auth/login`) devolve um token JWT.
+2. O frontend manda o token em toda requisição: `Authorization: Bearer <token>`.
+3. `get_current_user` lê o token e carrega o usuário.
+4. As permissões têm duas camadas:
+   - **`require_perfil(...)`**, por perfil: a rota só aceita os perfis informados. Ex.: cadastrar estudante é só para a Coordenação.
+   - **`requires_vinculo_turma`**, por recurso: o professor só lança nota e frequência em turma em que está vinculado. Fora disso, a API responde `403`.
 
 ---
 
-### 5. `app/api/` (Controladores e Segurança de Acesso)
-- **`deps.py`**: Injeções de dependência que rodam antes da rota ser executada:
-  - Obter usuário autenticado a partir do Bearer Token.
-  - **RBAC por Perfil**: Decorator ou `Depends` que confere se o perfil do usuário logado pode acessar aquele endpoint (ex.: apenas `COORDENACAO`).
-  - **RBAC por Recurso**: Dependency que consulta a tabela `turma_professores` e bloqueia o professor (`403 Forbidden`) caso ele tente lançar nota ou frequência em uma turma onde não leciona.
-- **`v1/api.py`**: Agrupa todos os roteadores individuais das entidades sob o prefixo comum `/api/v1`.
+## Endpoints
 
----
+Todos com prefixo `/api/v1`.
 
-### 6. `app/main.py` (Ponto de Entrada)
-- Instancia o `FastAPI()`.
-- Configura os middlewares de **CORS** para permitir requisições do frontend React (`http://localhost:5173`).
-- Registra os handlers globais de erro para formatar respostas no envelope padrão especificado.
-- Inclui o roteador da API v1 e expõe `/docs`.
+| Método | Rota | Quem pode | O que faz |
+|---|---|---|---|
+| POST | `/auth/login` | Todos | Login, devolve o token |
+| GET | `/auth/me` | Logado | Dados do usuário do token |
+| GET, POST | `/cursos` | Coordenação | Lista e cria cursos |
+| GET, POST | `/disciplinas` | Coordenação | Lista e cria disciplinas |
+| GET, POST | `/estudantes` | Coordenação | Lista e cadastra estudantes |
+| GET, PUT | `/estudantes/{id}` | Coordenação | Consulta e edita (inclusive reativar) |
+| PATCH | `/estudantes/{id}/inativar` | Coordenação | Inativa o estudante |
+| DELETE | `/estudantes/{id}` | Coordenação | Também inativa (não apaga do banco) |
+| GET, POST | `/professores` | Coordenação | Lista e cadastra professores |
+| GET, PUT | `/professores/{id}` | Coordenação | Consulta e edita (inclusive reativar) |
+| PATCH | `/professores/{id}/inativar` | Coordenação | Inativa o professor |
+| GET | `/professores/me/turmas` | Professor | Turmas do professor logado |
+| GET, POST | `/turmas` | Coordenação | Lista e cria turmas |
+| GET | `/turmas/minhas` | Professor | Turmas do professor logado |
+| GET | `/turmas/{id}` | Coordenação | Detalhe com professores e alunos |
+| POST | `/turmas/{id}/professores` | Coordenação | Vincula professor |
+| POST | `/turmas/{id}/matriculas` | Coordenação | Matricula aluno |
+| GET | `/turmas/{id}/alunos` | Professor vinculado | Alunos da turma |
+| POST | `/turmas/{id}/notas` | Professor vinculado | Lança nota |
+| GET | `/turmas/{id}/alunos/{aluno_id}/media` | Professor vinculado | Notas e média do aluno |
+| POST | `/turmas/{id}/frequencia` | Professor vinculado | Lança frequência |
+| GET | `/turmas/{id}/alunos/{aluno_id}/frequencia` | Professor vinculado | Frequência do aluno |
+| GET | `/alunos/me/boletim` | Aluno | Boletim: notas, média, frequência e situação |
 
----
+### Formato dos erros
 
-### 7. `tests/` (Testes com Pytest)
-- Onde ficam os testes unitários e de integração (testes de autenticação, testes de validação de RBAC por recurso e testes do cálculo do Template Method).
-
----
-
-## 🛠️ Comandos de Execução do Backend
-
-### 1. Criar e Ativar Ambiente Virtual
-No Windows PowerShell:
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+```json
+{ "detail": "Mensagem do erro", "code": "CODIGO", "fields": { "campo": "motivo" } }
 ```
-*(Se houver restrição de scripts no PowerShell: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`)*
 
-### 2. Instalar Dependências
-```powershell
-pip install -r requirements.txt
-```
-
-### 3. Configurar Ambiente
-```powershell
-cp .env.example .env
-```
-
-### 4. Executar Servidor
-```powershell
-uvicorn app.main:app --reload --port 8000
-```
-- Acesse `http://localhost:8000/docs` para ver o Swagger interativo.
-
-### 5. Executar os Testes
-```powershell
-pytest -v
-```
+| Status | Quando |
+|---|---|
+| 400 | Corpo da requisição em formato inválido (`code: VALIDATION_ERROR`, campos em `fields`) |
+| 401 | Sem token ou token inválido |
+| 403 | Perfil sem permissão, ou professor fora da turma |
+| 404 | Registro não encontrado |
+| 409 | Conflito (ex.: e-mail já cadastrado) |
+| 422 | Regra violada (ex.: nota fora de 0 a 10, peso zero, professor ou aluno inativo) |

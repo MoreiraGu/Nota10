@@ -1,149 +1,132 @@
-# 🎓 Nota 10 - Sistema de Gestão Acadêmica
+# Nota10 — Sistema de Gestão Acadêmica
 
-Sistema desenvolvido para controle acadêmico completo, atendendo aos três perfis de usuários: **Coordenação**, **Professor** e **Aluno**.
+Sistema web para controle acadêmico com três perfis de acesso: **Coordenação**, **Professor** e **Aluno**.
 
-Este documento apresenta a visão geral da arquitetura, os padrões adotados e o passo a passo unificado para rodar a aplicação.
+- **Frontend:** React + TypeScript + Vite + Tailwind CSS
+- **Backend:** Python + FastAPI + SQLAlchemy
+- **Banco:** SQLite (padrão) ou PostgreSQL (via Docker)
 
----
+Documentação de cada parte:
 
-## 🏛️ Visão Geral da Arquitetura
-
-O sistema é desacoplado em duas frentes independentes:
-
-```
-[ Frontend: React + TS (Vite) ]
-         │
-         │  HTTP / REST (JSON) com Bearer Token (JWT)
-         ▼
-[ Backend: FastAPI (/api/v1) ]
-   ├── Autenticação JWT e RBAC (Perfil + Recurso)
-   ├── Regras de Negócio e Padrões (Template Method)
-   └── ORM (SQLAlchemy)
-         │
-         ▼
-[ Banco de Dados: SQLite / PostgreSQL ]
-```
-
-> ⚠️ **Regra Fundamental:** O frontend apenas exibe dados e interfaces de acordo com as permissões autorizadas; o **backend é a única fonte de verdade** para validações, integridade e regras de negócio.
+- [Frontend](frontend/README.md): estrutura de pastas, padrão das páginas e rotas
+- [Backend](backend/README.md): API, regras de negócio e testes
 
 ---
 
-## 📂 Estrutura Geral do Repositório
+## O que cada perfil faz
+
+| Perfil | Funcionalidades |
+|---|---|
+| **Coordenação** | Painel com resumo do período; cadastro, edição, inativação e reativação de estudantes e professores; cadastro de cursos e disciplinas; abertura de turmas, vínculo de professores e matrícula de alunos |
+| **Professor** | Painel com suas turmas; lista de turmas em que leciona; lançamento de notas (a média é calculada pelo backend); lançamento de frequência |
+| **Aluno** | Painel com o resumo da situação; boletim com notas, média, frequência e situação por disciplina; histórico agrupado por período letivo; dados pessoais |
+
+---
+
+## Arquitetura
+
+```
+┌──────────────────────────────┐
+│  Frontend (React, porta 5173)│  telas, formulários e navegação
+└──────────────┬───────────────┘
+               │ HTTP + JSON, token JWT no cabeçalho Authorization
+┌──────────────▼───────────────┐
+│  Backend (FastAPI, porta 8000)│  autenticação, permissões e regras de negócio
+└──────────────┬───────────────┘
+               │ SQLAlchemy
+┌──────────────▼───────────────┐
+│  Banco (SQLite ou PostgreSQL)│
+└──────────────────────────────┘
+```
+
+**Regra principal:** o frontend só exibe dados e envia formulários. Média, frequência, situação acadêmica (aprovado, recuperação, reprovado) e permissões são decididas pelo backend.
+
+---
+
+## Estrutura do repositório
 
 ```text
 Nota10/
-├── backend/                  # API REST construída em Python com FastAPI
-│   ├── app/                  # Código-fonte da aplicação backend
-│   ├── tests/                # Testes automatizados com pytest
-│   ├── requirements.txt      # Dependências do backend
-│   ├── .env.example          # Exemplo de configurações de ambiente
-│   └── README.md             # 📖 Documentação detalhada da arquitetura do backend
-│
-├── frontend/                 # Aplicação SPA construída em React + TypeScript com Vite
-│   ├── src/                  # Código-fonte da aplicação frontend
-│   ├── package.json          # Dependências e scripts do frontend
-│   ├── vite.config.ts        # Configuração do Vite e proxy reverso
-│   └── README.md             # 📖 Documentação detalhada da arquitetura do frontend
-│
-├── docker-compose.yml        # Configuração para subir PostgreSQL opcional via container
-├── .gitignore                # Arquivos e pastas ignorados pelo Git
-└── README.md                 # Este documento
+├── backend/             API em FastAPI (ver backend/README.md)
+├── frontend/            Aplicação React (ver frontend/README.md)
+├── docker-compose.yml   PostgreSQL opcional
+└── README.md            Este arquivo
 ```
 
 ---
 
-## 📐 Padrões Adotados no Projeto
-
-Conforme os documentos de especificação e padrões:
-
-1. **Versionamento e Rotas:** Todas as rotas da API possuem o prefixo `/api/v1`.
-2. **Envelope de Erros:** Respostas de erro padronizadas (`detail`, `code`, `fields`).
-3. **Controle de Acesso (RBAC em 2 Camadas):**
-   - *Por Perfil:* Garante que apenas `COORDENACAO`, `PROFESSOR` ou `ALUNO` acessem suas respectivas rotas.
-   - *Por Recurso:* Garante que um professor só possa lançar notas e frequência em turmas nas quais esteja de fato vinculado.
-4. **Padrão de Projeto (Template Method):** Usado no backend para o cálculo de médias das disciplinas (etapa fixa de coleta -> etapa variável de critério de ponderação -> etapa fixa de consolidação).
-5. **Padrão Git (Git Flow & Conventional Commits):**
-   - Branches: `main`, `develop`, `feature/<nome>`, `hotfix/<nome>`.
-   - Commits: `feat(...)`, `fix(...)`, `refactor(...)`, `test(...)`, `chore(...)`.
-
----
-
-## 🚀 Como Rodar o Projeto Completo
+## Como rodar
 
 ### Pré-requisitos
-- Python 3.10 ou superior instalado
-- Node.js 18 ou superior e npm instalados
-- Docker (opcional, caso queira utilizar PostgreSQL em vez de SQLite)
 
----
+- Python 3.10 ou superior
+- Node.js 18 ou superior
+- Docker (opcional, só para usar PostgreSQL)
 
-### Passo 1: Executando o Backend (Terminal 1)
-
-Abra o terminal (PowerShell) e execute:
+### 1. Backend (terminal 1)
 
 ```powershell
-# 1. Navegue até a pasta do backend
 cd backend
-
-# 2. Crie o ambiente virtual Python
 python -m venv venv
-
-# 3. Ative o ambiente virtual
 .\venv\Scripts\Activate.ps1
-
-# 4. Instale as dependências
 pip install -r requirements.txt
-
-# 5. Crie o arquivo .env
-cp .env.example .env
-
-# 6. Inicie a API com recarregamento automático
+copy .env.example .env
+python -m app.core.init_db
 uvicorn app.main:app --reload --port 8000
 ```
 
-- 🔗 **API Backend:** `http://localhost:8000`
-- 📚 **Swagger (Docs interativa):** `http://localhost:8000/docs`
-- 🧪 **Rodar Testes:** `pytest -v`
+O comando `python -m app.core.init_db` cria as tabelas e os usuários de teste. Só precisa rodar uma vez.
 
----
+- API: http://localhost:8000
+- Documentação interativa (Swagger): http://localhost:8000/docs
 
-### Passo 2: Executando o Frontend (Terminal 2)
+> Para usar SQLite sem Docker, troque o `DATABASE_URL` do `.env` por `sqlite:///./nota10.db`.
 
-Abra um segundo terminal (PowerShell) e execute:
+### 2. Frontend (terminal 2)
 
 ```powershell
-# 1. Navegue até a pasta do frontend
 cd frontend
-
-# 2. Instale os pacotes npm
 npm install
-
-# 3. Crie o arquivo .env local
-cp .env.example .env
-
-# 4. Inicie o servidor de desenvolvimento
+copy .env.example .env
 npm run dev
 ```
 
-- 🌐 **Aplicação Web:** `http://localhost:5173`
+- Aplicação: http://localhost:5173
 
----
-
-### Passo 3: Banco de Dados PostgreSQL (Opcional)
-
-Por padrão, a aplicação utiliza **SQLite** (`nota10.db`) para rodar imediatamente sem nenhuma configuração externa. Se preferir rodar com **PostgreSQL**:
+### 3. PostgreSQL (opcional)
 
 ```powershell
-# Na raiz do projeto (Nota10):
 docker compose up -d
 ```
-E ajuste o `DATABASE_URL` no `backend/.env` para:
-`postgresql+psycopg2://postgres:postgrespassword@localhost:5433/nota10_db`
+
+O banco sobe na porta `5433`. O `DATABASE_URL` do `backend/.env.example` já aponta para ele.
+
+### Usuários de teste
+
+Criados pelo `init_db`, todos com a senha `123456`:
+
+| Perfil | E-mail |
+|---|---|
+| Coordenação | coordenacao@sgca.edu.br |
+| Professor | ana.martins@sgca.edu.br |
+| Aluno | rafael.almeida@sgca.edu.br |
+
+A tela de login tem botões que preenchem esses dados.
 
 ---
 
-## 📖 Documentações Específicas
+## Padrões do projeto
 
-Para entender o papel de cada pasta e arquivo em detalhe:
-- Consulte o [README do Backend](file:///c:/Users/Gustavo/Desktop/Nota10/backend/README.md)
-- Consulte o [README do Frontend](file:///c:/Users/Gustavo/Desktop/Nota10/frontend/README.md)
+- **Rotas da API** com prefixo `/api/v1`.
+- **Erros da API** no formato `{ "detail": ..., "code": ..., "fields": ... }`.
+- **Permissões em duas camadas:**
+  - por perfil: cada rota só aceita os perfis autorizados;
+  - por recurso: o professor só lança nota e frequência nas turmas em que está vinculado.
+- **Template Method** no cálculo da média (ver [backend/README.md](backend/README.md)).
+- **Frontend:** hook `useApi` para carregar dados e componentes pequenos e reutilizáveis (ver [frontend/README.md](frontend/README.md)).
+
+### Git
+
+- Branches: `main` (entregas), `develop` (integração), `feature/<nome>`, `refactor/<nome>`, `hotfix/<nome>`, `docs/<nome>`.
+- Commits no padrão Conventional Commits: `feat(...)`, `fix(...)`, `refactor(...)`, `test(...)`, `docs(...)`, `chore(...)`.
+- Todo merge em `develop` e `main` passa por Pull Request com aprovação de outro integrante.

@@ -21,7 +21,6 @@ const navByRole: Record<string, NavItem[]> = {
   ],
   aluno: [
     { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Minhas Turmas', href: '/minhas-turmas-aluno' },
     { label: 'Meu Boletim', href: '/boletim' },
     { label: 'Meu Histórico', href: '/historico' },
     { label: 'Meus Dados', href: '/meus-dados' },

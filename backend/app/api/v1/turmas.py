@@ -53,6 +53,7 @@ from app.schemas.turma import (
     TurmaResponse,
     TurmaProfessorResponse,
     VincularProfessorRequest,
+    MinhaTurmaResponse,
 )
 from app.services.turmas_professor import listar_turmas_do_professor
 from app.services.calculo_media import calculadora_padrao
